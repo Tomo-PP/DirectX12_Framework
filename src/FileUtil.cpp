@@ -25,6 +25,8 @@ bool SearchFilePath(const wchar_t* filename, std::wstring& result) {
 
 	// 実行ファイルのディレクトリ（.csoファイルなど）
 	wcscpy_s(dstPath, filename);
+	swprintf_s(dstPath, L"%s\\%s", eyePath, filename);
+	std::wcout << dstPath << std::endl;
 	if (PathFileExistsW(dstPath) == TRUE) {
 
 		result = dstPath;   // 引数のアドレスにパスの先頭アドレスを代入
@@ -43,7 +45,7 @@ bool SearchFilePath(const wchar_t* filename, std::wstring& result) {
 
 
 	// resファイルへのパス
-	swprintf_s(dstPath, L"..\\..\\res\\%s", filename);
+	swprintf_s(dstPath, L"%s\\..\\..\\res\\%s", eyePath, filename);
 	std::wcout << dstPath << std::endl;
 	if (PathFileExistsW(dstPath) == TRUE) {
 

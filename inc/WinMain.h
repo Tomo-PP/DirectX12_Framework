@@ -3,6 +3,9 @@
  * Include
  ****************************************************************/
 #include <windows.h>
+#undef max
+#undef min
+
 #include <cstdint>
 #include <cassert>
 #include <cmath>
@@ -127,19 +130,19 @@ private:
 	ComPtr<ID3D12Resource>       m_pVB;                 /* 頂点バッファ */
 	ComPtr<ID3D12Resource>       m_pIB;                 /* インデックスバッファ */
 	ComPtr<ID3D12Resource>       m_pDSB;                /* 深度ステンシルバッファ */
-	ComPtr<ID3D12DescriptorHeap> m_pHeapDSV;            /* 深度ステンシルビュー用のディスクリプタヒープ */
 	ComPtr<ID3D12Resource>       m_pCB[FrameCount * 2]; /* 定数バッファ（バックバッファの数×モデルの数分必要）*/
+	ComPtr<ID3D12DescriptorHeap> m_pHeapDSV;            /* 深度ステンシルビュー用のディスクリプタヒープ */
 	ComPtr<ID3D12RootSignature>  m_pRootSignature;      /* ルートシグネチャ */
 	ComPtr<ID3D12PipelineState>  m_pPSO;                /* パイプラインステート */
 	
 
-	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
-	D3D12_INDEX_BUFFER_VIEW       m_IBV;                /* インデックスバッファビュー */
-	Texture                       m_Texture;            /* テクスチャのデータを保存 */
-	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleDSV;          /* 深度ステンシルバッファビュー用のハンドル（ディスクリプタヒープの先頭ポインタ）*/
-	D3D12_VIEWPORT                m_Viewport;           /* ビューポート */
-	D3D12_RECT                    m_Scissor;            /* シザー矩形 */
-	ConstantBufferView<Transform> m_CBV[FrameCount * 2];    /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
+	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                  /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
+	D3D12_INDEX_BUFFER_VIEW       m_IBV;                  /* インデックスバッファビュー */
+	ConstantBufferView<Transform> m_CBV[FrameCount * 2];  /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
+	Texture                       m_Texture;              /* テクスチャのデータを保存 */
+	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleDSV;            /* 深度ステンシルバッファビュー用のハンドル（ディスクリプタヒープの先頭ポインタ）*/
+	D3D12_VIEWPORT                m_Viewport;             /* ビューポート */
+	D3D12_RECT                    m_Scissor;              /* シザー矩形 */
 
 
 public:

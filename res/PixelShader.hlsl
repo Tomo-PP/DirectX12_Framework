@@ -29,11 +29,7 @@ PSOutput main(VSOutput input)
     PSOutput output = (PSOutput) 0;
     
     // テクスチャをサンプルする
-    //output.Color = ColorMap.Sample(ColorSmp, input.TexCoord);
-    float2 uv = input.TexCoord;
-    output.Color = float4(uv.x, uv.y, 0.0f, 1.0f); // uv座標確認用（赤：u成分、緑：v成分）
-    //float2 pos = (input.Position.xy + 1.0f) * 0.5f;
-    //output.Color = float4(pos, 0.0f, 1.0f);
+    output.Color = ColorMap.Sample(ColorSmp, input.TexCoord);
     
     return output;
 }
