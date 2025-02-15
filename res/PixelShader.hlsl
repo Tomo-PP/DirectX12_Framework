@@ -5,6 +5,8 @@ struct VSOutput{
 	
     float4 Position : SV_POSITION;  // 頂点座標（射影行列）
 	float2 TexCoord : TEXCOORD;     // uv座標
+    float3 Normal   : NORMAL;       // 法線ベクトル
+    float3 Tangent  : TANGENT;      // 接戦ベクトル
 };
 
 
@@ -30,6 +32,7 @@ PSOutput main(VSOutput input)
     
     // テクスチャをサンプルする
     output.Color = ColorMap.Sample(ColorSmp, input.TexCoord);
+    //output.Color = float4(input.TexCoord, 0.0f, 1.0f);
     
     return output;
 }

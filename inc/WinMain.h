@@ -7,17 +7,22 @@
 #undef min
 
 #include <cstdint>
+
 #include <cassert>
 #include <cmath>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+
 #include <wrl.h>
+
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 #include "ResourceUploadBatch.h"
 #include "DDSTextureLoader.h"
 #include "VertexTypes.h"
 #include "FileUtil.h"
+#include "Mesh.h"
+#include "DescriptorManager.h"
 
 
 /****************************************************************
@@ -33,16 +38,6 @@
  * ComPtr（スマートポインタ）
  ****************************************************************/
 using namespace Microsoft::WRL;
-
-
-/****************************************************************
- * 頂点 構造体
- ****************************************************************/
-struct Vertex {
-
-	DirectX::XMFLOAT3 Position;  /* 位置座標 */
-	DirectX::XMFLOAT4 Color;     /* 頂点の色 */
-};
 
 
 /****************************************************************
@@ -80,6 +75,12 @@ struct ConstantBufferView {
 
 
 /****************************************************************
+ * class 宣言
+ ****************************************************************/
+class DescriptorManager;
+
+
+/****************************************************************
  * App Class
  ****************************************************************/
 class App {
@@ -110,40 +111,59 @@ private:
 	ComPtr<ID3D12Device>               m_pDevice;                    /* GPUデバイス */
 	ComPtr<ID3D12CommandQueue>         m_pCmdQueue;                  /* コマンドキュー */
 	ComPtr<IDXGISwapChain3>            m_pSwapChain;                 /* スワップチェイン（SwapChain3でフレームバッファ番号を取得できる） */
-	ComPtr<ID3D12Resource>             m_pColorBuffer[FrameCount];   /* カラーバッファ（バックバッファ）、フレーム数分必要（今回はダブルバッファリングなので２個） */
 	ComPtr<ID3D12CommandAllocator>     m_pCmdAllocator[FrameCount];  /* コマンドアロケーター、フレーム数分必要（今回はダブルバッファリングなので２個） */
 	ComPtr<ID3D12GraphicsCommandList>  m_pCmdList;                   /* コマンドリスト */
-	ComPtr<ID3D12DescriptorHeap>       m_pHeapRTV;                   /* レンダーターゲットビュー用ディスクリプタヒープ */
 	ComPtr<ID3D12Fence>                m_pFence;                     /* フェンス */
 
 
 	HANDLE                       m_FenceEvent;                 /* フェンスイベント（ウィンドウズの OSの機構を利用）*/
 	uint64_t                     m_FenceCounter[FrameCount];   /* フェンスカウンター（この値がインクリメントされたらGPU処理が完了）*/
 	uint32_t                     m_FrameIndex;                 /* 表示しているフレームバッファの番号 */
-	D3D12_CPU_DESCRIPTOR_HANDLE  m_HandleRTV[FrameCount];      /* レンダーターゲットビュー用CPUディスクリプターハンドル */
 
+
+	/*****************************************************************
+	 * Descriptor関連
+	 *****************************************************************/
+	DescriptorManager             m_DespManager;                     /* ディスクリプタヒープの管理クラス */
+
+	 /* VBVと IBVは特殊 */
+	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                             /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
+	D3D12_INDEX_BUFFER_VIEW       m_IBV;                             /* インデックスバッファビュー */
+
+	/* Heap */
+	ComPtr<ID3D12DescriptorHeap>       m_pHeapCBV_SRV_UAV;           /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
+
+	/* Descriptor */
+	ComPtr<ID3D12Resource>             m_pColorBuffer[FrameCount];   /* カラーバッファ（バックバッファ）、フレーム数分必要（今回はダブルバッファリングなので２個） */
+	ComPtr<ID3D12Resource>             m_pDSB;                       /* 深度ステンシルバッファ */
+	
+	ComPtr<ID3D12Resource>             m_pVB;                        /* 頂点バッファ */
+	ComPtr<ID3D12Resource>             m_pIB;                        /* インデックスバッファ */
+
+	ComPtr<ID3D12Resource>             m_pCB[FrameCount * 2];        /* 定数バッファ（バックバッファの数×モデルの数分必要）*/
+
+
+	ConstantBufferView<Transform> m_CBV[FrameCount * 2];  /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
+	Texture                       m_Texture;              /* テクスチャのデータを保存 */
 
 	/*****************************************************************
 	 * 描画用インターフェイスのメンバ変数
 	 *****************************************************************/
-	ComPtr<ID3D12DescriptorHeap> m_pHeapCBV_SRV_UAV;    /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
-	ComPtr<ID3D12Resource>       m_pVB;                 /* 頂点バッファ */
-	ComPtr<ID3D12Resource>       m_pIB;                 /* インデックスバッファ */
-	ComPtr<ID3D12Resource>       m_pDSB;                /* 深度ステンシルバッファ */
-	ComPtr<ID3D12Resource>       m_pCB[FrameCount * 2]; /* 定数バッファ（バックバッファの数×モデルの数分必要）*/
-	ComPtr<ID3D12DescriptorHeap> m_pHeapDSV;            /* 深度ステンシルビュー用のディスクリプタヒープ */
 	ComPtr<ID3D12RootSignature>  m_pRootSignature;      /* ルートシグネチャ */
 	ComPtr<ID3D12PipelineState>  m_pPSO;                /* パイプラインステート */
 	
 
-	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                  /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
-	D3D12_INDEX_BUFFER_VIEW       m_IBV;                  /* インデックスバッファビュー */
-	ConstantBufferView<Transform> m_CBV[FrameCount * 2];  /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
-	Texture                       m_Texture;              /* テクスチャのデータを保存 */
-	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleDSV;            /* 深度ステンシルバッファビュー用のハンドル（ディスクリプタヒープの先頭ポインタ）*/
-	D3D12_VIEWPORT                m_Viewport;             /* ビューポート */
-	D3D12_RECT                    m_Scissor;              /* シザー矩形 */
+	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleRTV[FrameCount];  /* レンダーターゲットビュー用CPUディスクリプターハンドル */
+	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleDSV;             /* 深度ステンシルバッファビュー用のハンドル（ディスクリプタヒープの先頭ポインタ）*/
+	D3D12_VIEWPORT                m_Viewport;              /* ビューポート */
+	D3D12_RECT                    m_Scissor;               /* シザー矩形 */
 
+
+	/*****************************************************************
+	 * メッシュ用変数
+	 *****************************************************************/
+	std::vector<Mesh>        m_meshes;   /* メッシュ情報（複数定義できるように可変配列）*/
+	std::vector<Material> m_materials;   /* マテリアル情報 */
 
 public:
 

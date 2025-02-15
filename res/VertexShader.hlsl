@@ -5,6 +5,8 @@ struct VSInput{
 	
     float3 Position : POSITION;   // 位置座標
 	float2 TexCoord : TEXCOORD;   // uv座標
+	float3 Normal   : NORMAL;     // 法線ベクトル
+	float3 Tangent  : TANGENT;    // 接線ベクトル
 };
 
 
@@ -15,7 +17,15 @@ struct VSOutput{
 	
     float4 Position : SV_POSITION;  // 頂点座標（射影座標に変換済み）
 	float2 TexCoord : TEXCOORD;     // uv座標
+	float3 Normal   : NORMAL;       // 法線ベクトル
+    float3 Tangent  : TANGENT;      // 接戦ベクトル
 };
+
+
+/*******************************************************
+ * Camera 定数バッファ（View行列）
+ *******************************************************/
+
 
 
 /*******************************************************
@@ -44,6 +54,7 @@ VSOutput main( VSInput input){
 	
     output.Position = projectPos;
     output.TexCoord = input.TexCoord;
+	output.Normal   = input.Normal;
 	
 	return output;
 }
