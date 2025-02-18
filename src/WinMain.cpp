@@ -1,6 +1,17 @@
+
+/****************************************************************
+ * Include
+ ****************************************************************/
 #include "WinMain.h"
 #include <iostream>
 #include <string>
+#include <SimpleMath.h>
+
+
+#if defined (DEBUG) || defined (_DEBUG)
+	ComPtr<ID3D12DebugDevice> debugDevice;
+#endif
+
 
 App::App(uint32_t width, uint32_t height, LPCWSTR title):
 	m_hInst       (nullptr),
@@ -17,12 +28,14 @@ App::App(uint32_t width, uint32_t height, LPCWSTR title):
 
 	m_pVB         (nullptr),
 	m_pPSO        (nullptr),
-	m_FrameIndex  (0)
+	m_FrameIndex  (0),
+	m_CBV         (),
+	m_Scissor     (),
+	m_Viewport    ()
 {
 	for (auto i = 0u; i < FrameCount; i++) {
 
 		m_pCmdAllocator[i] = nullptr;
-		m_pColorBuffer[i]  = nullptr;
 		m_FenceCounter[i]  = 0;
 	}
 }
@@ -170,6 +183,12 @@ bool App::InitDirect3D() {
 
 		return false;
 	}
+	m_pDevice->SetName(L"GPUDevice");
+
+#if defined (DEBUG) || defined (_DEBUG)
+	m_pDevice.As(&debugDevice);
+	
+#endif
 
 
 	// コマンドキューの生成
@@ -187,6 +206,7 @@ bool App::InitDirect3D() {
 
 			return false;
 		}
+		m_pCmdQueue->SetName(L"CommandQueue");
 	}
 
 
@@ -247,6 +267,7 @@ bool App::InitDirect3D() {
 		// 必要ないオブジェクトの解放
 		SafeRelease(pSwapChain);
 		SafeRelease(pFactory);
+
 	}
 
 
@@ -262,6 +283,9 @@ bool App::InitDirect3D() {
 				return false;
 			}
 		}
+
+		m_pCmdAllocator[0]->SetName(L"CommandAllocator_1");
+		m_pCmdAllocator[1]->SetName(L"CommandAllocator_2");
 	}
 
 
@@ -277,6 +301,8 @@ bool App::InitDirect3D() {
 
 			return false;
 		}
+
+		m_pCmdList->SetName(L"CommandList");
 	}
 
 
@@ -304,6 +330,8 @@ bool App::InitDirect3D() {
 
 			return false;
 		}
+
+		m_pFence->SetName(L"Fence");
 	}
 
 
@@ -324,6 +352,13 @@ bool App::InitDirect3D() {
 	// コマンドリストを閉じる
 	m_pCmdList->Close();
 
+	// Imguiの初期化
+	if (!Init_Imgui()) {
+
+		std::cout << "Error : Can't Initialize Imgui." << std::endl;
+		return false;
+	}
+
 
 	// 正常終了
 	return true;
@@ -333,12 +368,45 @@ bool App::InitDirect3D() {
 
 bool App::OnInit() {
 
+	// Imguiの初期化
+	{
+		if (ImGui::CreateContext() == nullptr) {
+
+			std::cout << "Imguiの初期化に失敗" << std::endl;
+			return false;
+		}
+
+		// Windowの初期化
+		bool blnResult = ImGui_ImplWin32_Init(m_hWnd);
+		if (!blnResult) {
+
+			std::cout << "ImguiのWindow初期化に失敗" << std::endl;
+			return false;
+		}
+
+		blnResult = ImGui_ImplDX12_Init(
+			m_pDevice.Get(),                                         // デバイス
+			3,                                                       // フレーム
+			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,                         // RTVフォーマット
+			m_pHeapForImgui.Get(),                                   // Imguiヒープ
+			m_pHeapForImgui->GetCPUDescriptorHandleForHeapStart(),   // CPUハンドル
+			m_pHeapForImgui->GetGPUDescriptorHandleForHeapStart());  // GPUハンドル
+
+		if (!blnResult) {
+
+			std::cout << "Imgui初期化に失敗" << std::endl;
+			return false;
+		}
+
+	}
+
+
 	// メッシュをロード
 	{
 
 		// パスの検索
 		std::wstring path;
-		if (!SearchFilePath(L"house/FarmhouseOBJ.obj", path)) {
+		if (!SearchFilePath(L"Floor/Untitled.obj", path)) {
 
 			std::cout << "OBJファイルが見つかりません" << std::endl;
 			return false;
@@ -499,7 +567,7 @@ bool App::OnInit() {
 		// ディスクリプタヒープの設定
 		D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 		heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;     /* 定数バッファを含んだフラグを指定 */
-		heapDesc.NumDescriptors = 2 * FrameCount;                             /* ディスクリプタの数 */
+		heapDesc.NumDescriptors = 10;                                         /* ディスクリプタの数 */
 		heapDesc.NodeMask       = 0;                                          /* GPUは１つなので０を指定 */
 		heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;  /* シェーダー側から参照できるようにする */
 
@@ -517,6 +585,8 @@ bool App::OnInit() {
 
 	// 定数バッファの生成（座標行列などをシェーダーに渡すバッファ）
 	{
+		auto align = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;                 // アライメントサイズ（256 Byte）
+		uint64_t alignmentSize = (sizeof(Transform) + (align - 1)) & ~(align - 1);   // アライメントサイズの計算
 
 		// ヒーププロパティ（データをどう送るのかを記述）
 		D3D12_HEAP_PROPERTIES heapProp = {};
@@ -530,7 +600,7 @@ bool App::OnInit() {
 		D3D12_RESOURCE_DESC resourceDesc = {};
 		resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;  /* 扱うリソースの次元を設定（頂点バッファなので *BUFFERを指定） */
 		resourceDesc.Alignment          = 0;                                /* メモリの区切る量 *BUFFERの場合は 64 KBまたは 0を指定 */
-		resourceDesc.Width              = sizeof(Transform);                /* データサイズ：256 Byte（256 Byteを超える場合 512 Byte）*/
+		resourceDesc.Width              = alignmentSize;                    /* データサイズ：256 Byte（256 Byteを超える場合 512 Byte）*/
 		resourceDesc.Height             = 1;                                /* データの縦のサイズ（バッファなので１）*/
 		resourceDesc.DepthOrArraySize   = 1;                                /* データの奥行（バッファなので１）*/
 		resourceDesc.MipLevels          = 1;                                /* ミップマップのレベルの設定（バッファの場合は１） */
@@ -561,19 +631,19 @@ bool App::OnInit() {
 			}
 
 			// 定数バッファのアドレス
-			auto addressGPU = m_pCB[i]->GetGPUVirtualAddress();                         // GPUの仮想アドレスを取得
-			auto handleCPU = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();  // ディスクリプタヒープの先頭ハンドルを取得（CPU）
-			auto handleGPU = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();  // ディスクリプタヒープの先頭ハンドルを取得（GPU）
+			auto addressGPU = m_pCB[i]->GetGPUVirtualAddress();                          // GPUの仮想アドレスを取得
+			auto handleCPU  = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();  // ディスクリプタヒープの先頭ハンドルを取得（CPU）
+			auto handleGPU  = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();  // ディスクリプタヒープの先頭ハンドルを取得（GPU）
 
 			// 定数バッファの先頭ポインタを計算（定数バッファのサイズ分をインクリメント）
 			handleCPU.ptr += incrementSize * i;
 			handleGPU.ptr += incrementSize * i;
 
 			// 定数バッファビューの設定（定数バッファの情報を保存）
-			m_CBV[i].HandleCPU = handleCPU;          // 定数バッファの先頭ハンドル（CPU）
-			m_CBV[i].HandleGPU = handleGPU;          // 定数バッファの先頭ハンドル（GPU）
+			m_CBV[i].HandleCPU              = handleCPU;          // 定数バッファの先頭ハンドル（CPU）
+			m_CBV[i].HandleGPU              = handleGPU;          // 定数バッファの先頭ハンドル（GPU）
 			m_CBV[i].CBVDesc.BufferLocation = addressGPU;         // バッファの保存位置を指定
-			m_CBV[i].CBVDesc.SizeInBytes = sizeof(Transform);  // 定数バッファのサイズ
+			m_CBV[i].CBVDesc.SizeInBytes    = alignmentSize;      // 定数バッファのサイズ
 
 			// 定数バッファビューの生成
 			m_pDevice->CreateConstantBufferView(&m_CBV[i].CBVDesc, handleCPU);
@@ -587,7 +657,7 @@ bool App::OnInit() {
 			}
 
 			// マッピングした行列を設定する
-			auto eyePos = DirectX::XMVectorSet(0.0f, 0.0f, 5.0f, 0.0f);     /* カメラ座標 */
+			auto eyePos = DirectX::XMVectorSet(10.0f, 0.0f, 0.0f, 0.0f);     /* カメラ座標 */
 			auto targetPos = DirectX::XMVectorZero();                       /* 注視点座標（原点）*/
 			auto upward = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);     /* カメラの高さ */
 
@@ -602,12 +672,172 @@ bool App::OnInit() {
 	}
 
 
+	// ライトの作成
+	{
+		auto align = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;                    // アライメントサイズ（256 Byte）
+		uint64_t alignmentSize = (sizeof(LightBuffer) + (align - 1)) & ~(align - 1);    // アライメントサイズの計算
 
-	// テクスチャの生成
+		// ヒーププロパティ（データをどう送るのかを記述）
+		D3D12_HEAP_PROPERTIES heapProp = {};
+		heapProp.Type                 = D3D12_HEAP_TYPE_UPLOAD;           /* ヒープのタイプを指定（今回はGPUに送る用のヒープ）*/
+		heapProp.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;  /* CPUページプロパティ（CPUの書き込み方法について・今回は指定なし）*/
+		heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;        /* メモリプールの扱いについて（今回は指定なし）*/
+		heapProp.CreationNodeMask     = 1;                                /* GPUの数 */
+		heapProp.VisibleNodeMask      = 1;                                /* GPUの識別する数 */
+
+		// リソースの設定
+		D3D12_RESOURCE_DESC resourceDesc = {};
+		resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;  /* 扱うリソースの次元を設定（頂点バッファなので *BUFFERを指定） */
+		resourceDesc.Alignment          = 0;                                /* メモリの区切る量 *BUFFERの場合は 64 KBまたは 0を指定 */
+		resourceDesc.Width              = alignmentSize;                    /* データサイズ：256 Byte（256 Byteを超える場合 512 Byte）*/
+		resourceDesc.Height             = 1;                                /* データの縦のサイズ（バッファなので１）*/
+		resourceDesc.DepthOrArraySize   = 1;                                /* データの奥行（バッファなので１）*/
+		resourceDesc.MipLevels          = 1;                                /* ミップマップのレベルの設定（バッファの場合は１） */
+		resourceDesc.Format             = DXGI_FORMAT_UNKNOWN;              /* データのフォーマットを指定（テクスチャの場合はピクセルフォーマットを指定）*/
+		resourceDesc.SampleDesc.Count   = 1;                                /* アンチエイリアシングの設定（０だとデータがないことになってしまう）*/
+		resourceDesc.SampleDesc.Quality = 0;                                /* アンチエイリアシングの設定（今回は使わないので０） */
+		resourceDesc.Layout             = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;   /* 始まりから終わりまで連続したバッファなので *MAJOR（テクスチャの場合は *UNKNOWN）*/
+		resourceDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;         /* 今回は設定なし（RTV・DSV・UAV・SRVの場合は設定する） */
+
+
+		// ディスクリプタヒープ内のデータについて、次のデータに移動するためのインクリメントサイズを取得
+		auto incrementSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		HRESULT hr = m_pDevice->CreateCommittedResource(
+			&heapProp,
+			D3D12_HEAP_FLAG_NONE,                    /* ヒープのオプション */
+			&resourceDesc,                           /* リソースの設定 */
+			D3D12_RESOURCE_STATE_GENERIC_READ,       /* リソースの初期状態を指定（ヒープ設定で *UPLOADにした場合 *GENERIC_READを指定）*/
+			nullptr,                                 /* RTVとDSV用の設定 */
+			IID_PPV_ARGS(m_pCB[2].GetAddressOf()));  /* アドレスを格納 */
+		if (FAILED(hr)) {
+
+			std::cout << "Error : Can't create Material Resource." << std::endl;
+			return false;
+		}
+
+		auto virtualAddress = m_pCB[2]->GetGPUVirtualAddress();                          /* GPUのアドレス */
+		auto handleCPU      = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();  /* CPUヒープの先頭 */
+		auto handleGPU      = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();  /* GPUヒープの先頭 */
+
+		// 行列変換用のCBV分を飛ばす
+		handleCPU.ptr += incrementSize * 2;
+		handleGPU.ptr += incrementSize * 2;
+
+		// 定数バッファビュー
+		m_LightCBV.HandleCPU              = handleCPU;         /* CPU仮想アドレス */
+		m_LightCBV.HandleGPU              = handleGPU;         /* GPUヒープの先頭 */
+		m_LightCBV.CBVDesc.BufferLocation = virtualAddress;    /* GPU仮想アドレス */
+		m_LightCBV.CBVDesc.SizeInBytes    = static_cast<UINT>(alignmentSize);     /* バッファのサイズ（アライメントサイズ）*/
+
+		// 定数バッファビューの生成
+		m_pDevice->CreateConstantBufferView(&m_LightCBV.CBVDesc, handleCPU);
+
+
+		//定数バッファ（Material）のマッピングを行う
+		hr = m_pCB[2]->Map(0, nullptr, reinterpret_cast<void**>(&m_LightCBV.pBuffer));  // 上で設定したサイズ分のGPUリソースへのポインタを取得
+		if (FAILED(hr)) {
+			std::cout << "ライト用定数バッファのマップエラー" << std::endl;
+			return false;
+		}
+
+		m_LightCBV.pBuffer->LightPosition = Vector4(10.0f, 0.0f, 0.0f, 0.0f);  /* ライト座標 */
+		m_LightCBV.pBuffer->LightColor    = Color(1.0f, 1.0f, 1.0f, 0.0f);    /* ライト色 */
+	}
+
+
+	// マテリアルの生成（CBV）
+	{
+
+		auto align = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;                 // アライメントサイズ（256 Byte）
+		uint64_t alignmentSize = (sizeof(Material) + (align - 1)) & ~(align - 1);    // アライメントサイズの計算
+
+		// ヒーププロパティ（データをどう送るのかを記述）
+		D3D12_HEAP_PROPERTIES heapProp = {};
+		heapProp.Type                 = D3D12_HEAP_TYPE_UPLOAD;           /* ヒープのタイプを指定（今回はGPUに送る用のヒープ）*/
+		heapProp.CPUPageProperty      = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;  /* CPUページプロパティ（CPUの書き込み方法について・今回は指定なし）*/
+		heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;        /* メモリプールの扱いについて（今回は指定なし）*/
+		heapProp.CreationNodeMask     = 1;                                /* GPUの数 */
+		heapProp.VisibleNodeMask      = 1;                                /* GPUの識別する数 */
+
+		// リソースの設定
+		D3D12_RESOURCE_DESC resourceDesc = {};
+		resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;  /* 扱うリソースの次元を設定（頂点バッファなので *BUFFERを指定） */
+		resourceDesc.Alignment          = 0;                                /* メモリの区切る量 *BUFFERの場合は 64 KBまたは 0を指定 */
+		resourceDesc.Width              = alignmentSize;                    /* データサイズ：256 Byte（256 Byteを超える場合 512 Byte）*/
+		resourceDesc.Height             = 1;                                /* データの縦のサイズ（バッファなので１）*/
+		resourceDesc.DepthOrArraySize   = 1;                                /* データの奥行（バッファなので１）*/
+		resourceDesc.MipLevels          = 1;                                /* ミップマップのレベルの設定（バッファの場合は１） */
+		resourceDesc.Format             = DXGI_FORMAT_UNKNOWN;              /* データのフォーマットを指定（テクスチャの場合はピクセルフォーマットを指定）*/
+		resourceDesc.SampleDesc.Count   = 1;                                /* アンチエイリアシングの設定（０だとデータがないことになってしまう）*/
+		resourceDesc.SampleDesc.Quality = 0;                                /* アンチエイリアシングの設定（今回は使わないので０） */
+		resourceDesc.Layout             = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;   /* 始まりから終わりまで連続したバッファなので *MAJOR（テクスチャの場合は *UNKNOWN）*/
+		resourceDesc.Flags              = D3D12_RESOURCE_FLAG_NONE;         /* 今回は設定なし（RTV・DSV・UAV・SRVの場合は設定する） */
+
+
+		// ディスクリプタヒープ内のデータについて、次のデータに移動するためのインクリメントサイズを取得
+		auto incrementSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		HRESULT hr = m_pDevice->CreateCommittedResource(
+			&heapProp,
+			D3D12_HEAP_FLAG_NONE,                    /* ヒープのオプション */
+			&resourceDesc,                           /* リソースの設定 */
+			D3D12_RESOURCE_STATE_GENERIC_READ,       /* リソースの初期状態を指定（ヒープ設定で *UPLOADにした場合 *GENERIC_READを指定）*/
+			nullptr,                                 /* RTVとDSV用の設定 */
+			IID_PPV_ARGS(m_pCB[3].GetAddressOf()));  /* アドレスを格納 */
+		if (FAILED(hr)) {
+
+			std::cout << "Error : Can't create Material Resource." << std::endl;
+			return false;
+		}
+
+		auto virtualAddress = m_pCB[3]->GetGPUVirtualAddress();                          /* GPUのアドレス */
+		auto handleCPU      = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();  /* CPUヒープの先頭 */
+		auto handleGPU      = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();  /* GPUヒープの先頭 */
+
+		// 行列変換用のCBV分を飛ばす
+		handleCPU.ptr += incrementSize * 3;
+		handleGPU.ptr += incrementSize * 3;
+
+		// 定数バッファビュー
+		m_Material.HandleCPU              = handleCPU;         /* CPU仮想アドレス */
+		m_Material.HandleGPU              = handleGPU;         /* GPUヒープの先頭 */
+		m_Material.CBVDesc.BufferLocation = virtualAddress;    /* GPU仮想アドレス */
+		m_Material.CBVDesc.SizeInBytes    = static_cast<UINT>(alignmentSize);     /* バッファのサイズ（アライメントサイズ）*/
+
+		// 定数バッファビューの生成
+		m_pDevice->CreateConstantBufferView(&m_Material.CBVDesc, handleCPU);
+
+
+		//定数バッファ（Material）のマッピングを行う
+		hr = m_pCB[3]->Map(0, nullptr, reinterpret_cast<void**>(&m_Material.pBuffer));  // 上で設定したサイズ分のGPUリソースへのポインタを取得
+		if (FAILED(hr)) {
+			std::cout << "マテリアル用定数バッファのマップエラー" << std::endl;
+			return false;
+		}
+
+		// メッシュから定数バッファを取得
+		Material material = m_materials[0];
+
+		// マテリアルの設定
+		m_Material.pBuffer->Diffuse   = material.Diffuse;
+		m_Material.pBuffer->alpha     = material.alpha;
+		m_Material.pBuffer->Specular  = material.Specular;
+		m_Material.pBuffer->Shininess = material.Shininess;
+
+		std::cout << "Diffuse : " << m_Material.pBuffer->Diffuse.x << ", " << m_Material.pBuffer->Diffuse .y << ", " << m_Material.pBuffer->Diffuse.z << std::endl;
+		std::cout << "alpha : " << m_Material.pBuffer->alpha << std::endl;
+		std::cout << "Specular : " << m_Material.pBuffer->Specular.x << ", " << m_Material.pBuffer->Specular.y << ", " << m_Material.pBuffer->Specular.z << std::endl;
+		std::cout << "Shininess : " << m_Material.pBuffer->Shininess << std::endl;
+	}
+
+
+
+	// テクスチャの生成（SRV）
 	{
 		// ファイルパスの検索
 		std::wstring texturePath;
-		if (!SearchFilePath(L"house/FarmhouseTexture.dds", texturePath)) {
+		if (!SearchFilePath(L"Floor/BrickRound.dds", texturePath)) {
 
 			return false;
 		}
@@ -643,9 +873,9 @@ bool App::OnInit() {
 		auto handleCPU = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();
 		auto handleGPU = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();
 
-		// テクスチャにディスクリプタハンドルを割り当てる（コンスタントバッファ分のディスクリプタヒープを飛ばす必要あり）
-		handleCPU.ptr += incrementSize * 2;
-		handleGPU.ptr += incrementSize * 2;
+		// テクスチャにディスクリプタハンドルを割り当てる（CBV×4を飛ばす必要あり）
+		handleCPU.ptr += incrementSize * 4;
+		handleGPU.ptr += incrementSize * 4;
 
 		m_Texture.HandleCPU = handleCPU;
 		m_Texture.HandleGPU = handleGPU;
@@ -671,6 +901,78 @@ bool App::OnInit() {
 	}
 
 
+	// 法線マップの生成（SRV）
+	{
+		// ファイルパスの検索
+		std::wstring texturePath;
+		if (!SearchFilePath(L"Floor/BrickRoundBUMP.dds", texturePath)) {
+
+			std::cout << "Error : Can't find Texture." << std::endl;
+			return false;
+		}
+
+
+		// 画像データの読み取り処理
+		DirectX::ResourceUploadBatch batch(m_pDevice.Get());
+		batch.Begin();                                        // 内部処理でコマンドアロケーターとコマンドリストが生成される
+
+		// リソースの生成（この関数で一気にリソースを生成できる。リソース設定からしなくてもよい）
+		HRESULT hr = DirectX::CreateDDSTextureFromFile(
+			m_pDevice.Get(),                        /* デバイスを渡す */
+			batch,                                  /*  */
+			texturePath.c_str(),                    /* テクスチャまでのパス（ワイド文字をマルチバイトに変換して渡す必要あり）*/
+			NormalMapSRV.pResource.GetAddressOf(),  /* テクスチャのアドレスを取得 */
+			true);                                  /*  */
+		if (FAILED(hr)) {
+
+			return false;
+		}
+
+
+		// コマンドの実行
+		auto future = batch.End(m_pCmdQueue.Get());
+
+		// コマンド完了まで待機
+		future.wait();
+
+		// インクリメントサイズを取得（シェーダー用（SRV）のメモリのインクリメントサイズ）
+		auto incrementSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		// CPUディスクリプタハンドルとGPUディスクリプタハンドルをディスクリプタヒープから取得
+		auto handleCPU = m_pHeapCBV_SRV_UAV->GetCPUDescriptorHandleForHeapStart();
+		auto handleGPU = m_pHeapCBV_SRV_UAV->GetGPUDescriptorHandleForHeapStart();
+
+		// テクスチャにディスクリプタハンドルを割り当てる（CBV×4＋SRV×1を飛ばす必要あり）
+		handleCPU.ptr += incrementSize * 5;
+		handleGPU.ptr += incrementSize * 5;
+
+		NormalMapSRV.HandleCPU = handleCPU;
+		NormalMapSRV.HandleGPU = handleGPU;
+
+		// テクスチャの構成を取得（上のライブラリで生成された構成を読み込む）
+		auto textureDesc = NormalMapSRV.pResource->GetDesc();
+
+		// シェーダリソースビューの設定
+		D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
+		SRVDesc.ViewDimension                 = D3D12_SRV_DIMENSION_TEXTURE2D;             /*  */
+		SRVDesc.Format                        = textureDesc.Format;                        /*  */
+		SRVDesc.Shader4ComponentMapping       = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;  /*  */
+		SRVDesc.Texture2D.MipLevels           = textureDesc.MipLevels;                     /*  */
+		SRVDesc.Texture2D.MostDetailedMip     = 0;                                         /*  */
+		SRVDesc.Texture2D.PlaneSlice          = 0;                                         /*  */
+		SRVDesc.Texture2D.ResourceMinLODClamp = 0.0f;                                      /*  */
+
+		// シェーダーリソースビューの生成
+		m_pDevice->CreateShaderResourceView(
+			NormalMapSRV.pResource.Get(),        /*  */
+			&SRVDesc,                            /*  */
+			handleCPU);                          /*  */
+	}
+
+
+	// ここから上の処理を一つのオブジェクトクラスに処理としてまとめたい==============================================
+
+
 
 	// ルートシグネチャ生成（シェーダー内で使用するリソースの扱い方を決める）
 	{
@@ -681,28 +983,57 @@ bool App::OnInit() {
 		flagLayout |= D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;   /* ドメインシェーダーのルートシグネチャへのアクセスを拒否 */
 		flagLayout |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS; /* ジオメトリーシェーダーのルートシグネチャへのアクセスを拒否 */
 
-		
-		// ルートパラメーターの設定（定数バッファ用・CBVシェーダーに送る CBV・SRV・UAVを設定）
-		D3D12_ROOT_PARAMETER rootParam[2] = {};
+
+		// ディスクリプターテーブル（SRV）の範囲を設定
+
+		// テクスチャのSRV
+		D3D12_DESCRIPTOR_RANGE range[2] = {};
+		range[0].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;  /* ディスクリプタの種類を設定 */
+		range[0].NumDescriptors                    = 1;                                /* ディスクリプターの数 */
+		range[0].BaseShaderRegister                = 0;                                /* 始めるレジスタ番号 */
+		range[0].RegisterSpace                     = 0;                                /*  */
+		range[0].OffsetInDescriptorsFromTableStart = 0;                                /* オフセット */
+
+		// 法線マップのSRV
+		range[1].RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;  /* ディスクリプタの種類 */
+		range[1].NumDescriptors                    = 1;                                /* ディスクリプタの数 */
+		range[1].BaseShaderRegister                = 1;                                /* 始める番号 */
+		range[1].RegisterSpace                     = 0;                                /*  */
+		range[1].OffsetInDescriptorsFromTableStart = 0;                                /* オフセット */
+
+
+		// ルートパラメーターの設定（CBV・SRVをシェーダーに送る | CBV | CBV | CBV | SRV | SRV | ）
+
+		// 変換行列（CBV）
+		D3D12_ROOT_PARAMETER rootParam[5] = {};
 		rootParam[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;  /* ルートパラメーターのタイプは定数バッファ（CBV）*/
-		rootParam[0].Descriptor.ShaderRegister = 0;                              /*  */
+		rootParam[0].Descriptor.ShaderRegister = 0;                              /* レジスタの開始番号 */
 		rootParam[0].Descriptor.RegisterSpace  = 0;                              /* 今回は使わない */
 		rootParam[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_VERTEX; /* 頂点シェーダーから参照できるようにする */
 
-		// ディスクリプターテーブルの範囲を設定
-		D3D12_DESCRIPTOR_RANGE range = {};
-		range.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;  /* ディスクリプタの種類を設定 */
-		range.NumDescriptors                    = 1;                                /* ディスクリプターの数（今回はSRVの一つだけ） */
-		range.BaseShaderRegister                = 0;                                /*  */
-		range.RegisterSpace                     = 0;                                /*  */
-		range.OffsetInDescriptorsFromTableStart = 0;                                /*  */
+		// ライト行列（CBV）
+		rootParam[1].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParam[1].Descriptor.ShaderRegister = 1;
+		rootParam[1].Descriptor.RegisterSpace  = 0;
+		rootParam[1].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
 
+		// マテリアル行列（CBV）
+		rootParam[2].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParam[2].Descriptor.ShaderRegister = 2;
+		rootParam[2].Descriptor.RegisterSpace  = 0;
+		rootParam[2].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
 
-		// ルートパラメーターの設定（テクスチャ用・SRV）
-		rootParam[1].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  /* ルートパラメーターのタイプ（ディスクリプターテーブル）*/
-		rootParam[1].DescriptorTable.NumDescriptorRanges = 1;                                           /*  */
-		rootParam[1].DescriptorTable.pDescriptorRanges   = &range;                                      /* 設定したディスクリプタレンジを指定 */
-		rootParam[1].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               /* ピクセルシェーダーで使用できるようにする */
+		// テクスチャ用（SRV）
+		rootParam[3].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  /* ルートパラメーターのタイプ（ディスクリプターテーブル）*/
+		rootParam[3].DescriptorTable.NumDescriptorRanges = 1;                                           /* レンジの数 */
+		rootParam[3].DescriptorTable.pDescriptorRanges   = &range[0];                                   /* 設定したディスクリプタレンジを指定 */
+		rootParam[3].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               /* ピクセルシェーダーで使用できるようにする */
+
+		// 法線マップ用（SRV）
+		rootParam[4].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  
+		rootParam[4].DescriptorTable.NumDescriptorRanges = 1;                                           
+		rootParam[4].DescriptorTable.pDescriptorRanges   = &range[1];                                   
+		rootParam[4].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               
 
 
 		// スタティックサンプラーの設定
@@ -721,14 +1052,13 @@ bool App::OnInit() {
 		SamplerDesc.RegisterSpace    = 0;                                            /* レジスタ空間の設定 */
 		SamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;                /* ピクセルシェーダーで使用できるように設定 */
 
-
 		// ルートシグネチャの設定
 		D3D12_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.NumParameters     = 2;             /* ルートパラメーターの数 */
-		rootSigDesc.NumStaticSamplers = 1;             /* スタティックサンプラーの数 */
-		rootSigDesc.pParameters       = rootParam;     /* 定義したルートパラメーターを指定（配列の先頭アドレス）*/
-		rootSigDesc.pStaticSamplers   = &SamplerDesc;  /* 先ほど設定したスタティックサンプラーを指定 */
-		rootSigDesc.Flags             = flagLayout;    /* 指定したものがルートシグネチャをアクセスすることを拒否するフラグ */
+		rootSigDesc.NumParameters     = _countof(rootParam);  /* ルートパラメーターの数 */
+		rootSigDesc.NumStaticSamplers = 1;                    /* スタティックサンプラーの数 */
+		rootSigDesc.pParameters       = rootParam;            /* 定義したルートパラメーターを指定（配列の先頭アドレス）*/
+		rootSigDesc.pStaticSamplers   = &SamplerDesc;         /* 先ほど設定したスタティックサンプラーを指定 */
+		rootSigDesc.Flags             = flagLayout;           /* 指定したものがルートシグネチャをアクセスすることを拒否するフラグ */
 
 		// ルートシグネチャのシリアライズ（バイト列に変換）
 		ComPtr<ID3DBlob> pBlob;                     /* ルートシグネチャをバイト変換したものを保存 */
@@ -758,31 +1088,9 @@ bool App::OnInit() {
 	}
 
 
+
 	// パイプラインステートの生成
 	{
-
-		//// 入力レイアウトの設定
-		//D3D12_INPUT_ELEMENT_DESC InputElement[2];  // 入力のデータ数分サイズを設定（今回は位置座標・色）
-
-		//// 頂点情報の入力設定（POSITION）
-		//InputElement[0].SemanticName         = "POSITION";                                  /* 頂点シェーダーで定義したセマンティック名を指定 */
-		//InputElement[0].SemanticIndex        = 0;                                           /* セマンティックインデックスを指定（セマンティック名が同じ場合設定）*/
-		//InputElement[0].Format               = DXGI_FORMAT_R32G32B32_FLOAT;              /* 入力のフォーマットを指定 */
-		//InputElement[0].InputSlot            = 0;                                           /* 入力スロット番号の指定（頂点バッファを複数扱わないので０）*/
-		//InputElement[0].AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT;                /* オフセットをバイト単位で指定（今回はデータが連続しているので *ALIGNEDを指定）*/
-		//InputElement[0].InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;  /* 頂点ごとのデータとして扱うように指定 */
-		//InputElement[0].InstanceDataStepRate = 0;                                           /* 頂点ごとにデータを扱うので０（インスタンスごとの場合設定） */
-
-		//// 色情報の入力設定（TEXCOORD）
-		//InputElement[1].SemanticName         = "TEXCOORD";                                  /* 頂点シェーダーで定義したセマンティック名を指定 */
-		//InputElement[1].SemanticIndex        = 0;                                           /* セマンティックインデックスを指定（セマンティック名が同じ場合設定）*/
-		//InputElement[1].Format               = DXGI_FORMAT_R32G32_FLOAT;                    /* 入力のフォーマットを指定 */
-		//InputElement[1].InputSlot            = 0;                                           /* 入力スロット番号の指定（頂点バッファを複数扱わないので０） */
-		//InputElement[1].AlignedByteOffset    = D3D12_APPEND_ALIGNED_ELEMENT;                /* オフセットをバイト単位で指定（今回はデータが連続しているので *ALIGNEDを指定）*/
-		//InputElement[1].InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;  /* 頂点ごとのデータとして扱うように指定 */
-		//InputElement[1].InstanceDataStepRate = 0;                                           /* 頂点ごとにデータを扱うので０（インスタンスごとの場合設定）*/
-
-
 
 		// ラスタライザーステートの設定（ポリゴンデータからピクセルデータへとラスタライズを行う際の状態設定）
 		D3D12_RASTERIZER_DESC RSdesc = {};
@@ -946,11 +1254,12 @@ void App::MainLoop() {
 void App::Update() {
 
 	static float rotate = 0;
-	rotate += 0.025f;
+	rotate += 0.015f;
 
 	// １つ目のポリゴン
-	m_CBV[m_FrameIndex].pBuffer->World = 
-		DirectX::XMMatrixRotationY(rotate + DirectX::XMConvertToRadians(45.0f)) * DirectX::XMMatrixScaling(0.07f, 0.07f, 0.07f);
+	m_CBV[m_FrameIndex].pBuffer->World =
+		DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(20.0f)) *
+		DirectX::XMMatrixRotationY(rotate + DirectX::XMConvertToRadians(45.0f));
 
 }
 
@@ -1009,24 +1318,28 @@ void App::Render() {
 	{
 		m_pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());                                  /* ルートシグネチャを送信 */
 		m_pCmdList->SetDescriptorHeaps(1, m_pHeapCBV_SRV_UAV.GetAddressOf());                          /* CBV・SRV・UAVを送信 */
-		m_pCmdList->SetGraphicsRootDescriptorTable(1, m_Texture.HandleGPU);                            /* テクスチャ */
-		m_pCmdList->SetGraphicsRootConstantBufferView(0, m_CBV[m_FrameIndex].CBVDesc.BufferLocation);  /* 定数バッファの設定を送信 */
-
 		m_pCmdList->SetPipelineState(m_pPSO.Get());                                                    /* パイプラインステートの設定 */
 
 		m_pCmdList->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);   /* 入力が三角形要素であることを指定 */
-
-		// メッシュの描画
-		m_pCmdList->IASetVertexBuffers(0, 1, &m_VBV);                                /* 頂点バッファを入力として指定 */
-		m_pCmdList->IASetIndexBuffer(&m_IBV);                                        /* インデックスバッファビューを指定 */
 		m_pCmdList->RSSetViewports(1, &m_Viewport);                                  /* ビューポートの設定 */
 		m_pCmdList->RSSetScissorRects(1, &m_Scissor);                                /* シザー矩形の設定 */
+
+		// メッシュの描画
+		m_pCmdList->IASetVertexBuffers(0, 1, &m_VBV);                                                  /* 頂点バッファを入力として指定 */
+		m_pCmdList->IASetIndexBuffer(&m_IBV);                                                          /* インデックスバッファビューを指定 */
+		m_pCmdList->SetGraphicsRootConstantBufferView(0, m_CBV[m_FrameIndex].CBVDesc.BufferLocation);  /* 行列変換用 CBV */
+		m_pCmdList->SetGraphicsRootConstantBufferView(1, m_LightCBV.CBVDesc.BufferLocation);           /* ライト */
+		m_pCmdList->SetGraphicsRootConstantBufferView(2, m_Material.CBVDesc.BufferLocation);           /* マテリアル */
+		m_pCmdList->SetGraphicsRootDescriptorTable(3, m_Texture.HandleGPU);                            /* テクスチャ */
+		m_pCmdList->SetGraphicsRootDescriptorTable(4, NormalMapSRV.HandleGPU);                         /* 法線マップ */
 
 		// インデックスの数を取得（DrawInstancedIndexがuint32_t型出ないといけないのでキャストしている）
 		auto IndexNum = static_cast<uint32_t>(m_meshes[0].Indices.size());
 		m_pCmdList->DrawIndexedInstanced(IndexNum, 1, 0, 0, 0);                             /* 描画 */
 	}
 
+	// Imguiの描画
+	ImguiRender();
 
 
 	// バリアをPresent状態（表示状態）に設定する
@@ -1127,8 +1440,22 @@ void App::TermApp() {
 
 void App::OnTerm() {
 
+
+	m_pPSO.Reset();              // パイプラインステートの破棄
+
+	// テクスチャの破棄
+	m_Texture.pResource.Reset();
+	m_Texture.HandleCPU.ptr = 0;
+	m_Texture.HandleGPU.ptr = 0;
+
+	// 法線マップの破棄
+	NormalMapSRV.pResource.Reset();
+	NormalMapSRV.HandleCPU.ptr = 0;
+	NormalMapSRV.HandleGPU.ptr = 0;
+
+
 	// 定数バッファを破棄する
-	for (auto i = 0u; i < FrameCount; i++) {
+	for (auto i = 0u; i < _countof(m_pCB); i++) {
 
 		if (m_pCB[i] != nullptr){
 
@@ -1145,6 +1472,8 @@ void App::OnTerm() {
 		m_meshes[i].Indices.clear();
 	}
 	m_meshes.clear();
+
+	// マテリアルの削除
 	m_materials.clear();
 
 
@@ -1154,7 +1483,6 @@ void App::OnTerm() {
 
 
 	m_pHeapCBV_SRV_UAV.Reset();  // CBV・SRV・UAVのディスクリプタヒープを破棄
-	m_pPSO.Reset();              // パイプラインステートの破棄
 
 
 	// バッファビューの破棄
@@ -1169,11 +1497,6 @@ void App::OnTerm() {
 	// ルートシグネチャの破棄
 	m_pRootSignature.Reset();
 
-	// テクスチャの破棄
-	m_Texture.pResource.Reset();
-	m_Texture.HandleCPU.ptr = 0;
-	m_Texture.HandleGPU.ptr = 0;
-
 }
 
 
@@ -1184,6 +1507,12 @@ void App::TermDirect3D() {
 
 
 	/* 生成した順番と逆順に解放していく */
+
+
+	// Imguiの破棄
+	m_pHeapForImgui.Reset();
+	Term_Imgui();
+
 	
 	// イベントの破棄
 	if (m_FenceEvent != nullptr) {
@@ -1223,7 +1552,12 @@ void App::TermDirect3D() {
 
 	// デバイスの破棄
 	m_pDevice.Reset();
-	
+
+#if defined (DEBUG) || defined (_DEBUG)
+
+	debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+	debugDevice.Reset();
+#endif
 }
 
 
@@ -1240,6 +1574,10 @@ void App::TermWindow() {
 }
 
 
+// ImGui用ウィンドウプロシージャ
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 	switch (msg) {
@@ -1252,6 +1590,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 		default:
 			break;
 	}
+
+	// ImGuiの処理を行う
+	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wp, lp);
+
 
 	/* 他のメッセージを処理してくれる関数を返す */
 	return DefWindowProc(hwnd, msg, wp, lp);
@@ -1266,4 +1608,72 @@ void SafeRelease(T* ptr) {
 		ptr->Release();
 		ptr = nullptr;
 	}
+}
+
+
+/* imguiの関数は以下に定義 */
+
+// Imgui 初期化
+bool App::Init_Imgui() {
+
+	// ディスクリプタヒープの取得
+	m_pHeapForImgui = CreateDescriptorHeapForImgui();
+
+	if (m_pHeapForImgui == nullptr) {
+
+		return false;
+	}
+
+	return true;
+}
+
+
+// Imgui用DescriptorHeapの生成
+ComPtr<ID3D12DescriptorHeap> App::CreateDescriptorHeapForImgui() {
+
+	ComPtr<ID3D12DescriptorHeap> ret;
+
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;  /* シェーダーから見えるように設定 */
+	desc.NodeMask       = 0;                                          /* 複数のGPUはない */
+	desc.NumDescriptors = 1;                                          /* ヒープの数は１つ */
+	desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;     /* CBV_SRV_UAVで定義 */
+
+	HRESULT hr = m_pDevice->CreateDescriptorHeap(
+		&desc, IID_PPV_ARGS(ret.ReleaseAndGetAddressOf()));
+
+	return ret;
+}
+
+// ディスクリプタヒープの参照処理
+ComPtr<ID3D12DescriptorHeap> App::GetHeapForImgui() {
+
+	return m_pHeapForImgui;
+}
+
+
+// Imguiの描画
+void App::ImguiRender() {
+
+	// 描画前処理（１つのウィンドウにNewFrameが３つ必要）
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	// ウィンドウの定義
+	ImGui::Begin("Render Test Menu");
+	ImGui::SetWindowSize(ImVec2(300, 400), ImGuiCond_::ImGuiCond_FirstUseEver);
+	ImGui::End();
+
+	ImGui::Render();
+	m_pCmdList->SetDescriptorHeaps(1, m_pHeapForImgui.GetAddressOf());      // Imguiのヒープをセット
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_pCmdList.Get());  // コマンドをセット
+}
+
+// Imguiの終了処理
+void App::Term_Imgui() {
+
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }

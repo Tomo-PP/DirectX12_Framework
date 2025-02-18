@@ -9,7 +9,9 @@
 
 DescriptorManager::DescriptorManager():
 	m_pHeapRTV  (nullptr),
-	m_pHeapDSV  (nullptr)
+	m_pHeapDSV  (nullptr),
+	m_HandleRTV (),
+	m_HandleDSV ()
 { /* DO_NOTHING */ }
 
 

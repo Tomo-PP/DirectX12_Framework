@@ -5,13 +5,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include "Mesh.h"
-#include <wrl.h>
-
-
-/****************************************************************
- * ComPtr（スマートポインタ）
- ****************************************************************/
-using namespace Microsoft::WRL;
+#include "ComPtr.h"
 
 
 /****************************************************************
@@ -25,6 +19,8 @@ private:
 	Mesh                       m_mesh;   /* メッシュ情報 */
 	D3D12_VERTEX_BUFFER_VIEW   m_VBV;    /* 頂点バッファビュー */
 	D3D12_INDEX_BUFFER_VIEW    m_IBV;    /* インデックスバッファビュー */
+
+	
 
 public:
 

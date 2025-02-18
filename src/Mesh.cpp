@@ -168,8 +168,7 @@ bool MeshLoader::Load(const wchar_t* filename, std::vector<Mesh>& meshes, std::v
 
 	// マテリアルのメモリを事前に確保
 	materials.clear();
-	materials.resize(pScene->HasTextures());  // メッシュの数だけ確保
-
+	materials.resize(pScene->mNumMaterials);  // メッシュの数だけ確保
 
 	// マテリアルデータを変換する
 	for (auto i = 0u; i < materials.size(); i++) {
@@ -316,6 +315,9 @@ void MeshLoader::ParseMaterial(Material& dstMaterial, const aiMaterial* pSrcMate
 			dstMaterial.DiffuseMap.clear();
 		}
 	}
+
+
+	// 法線マップの読み取り
 }
 
 }//

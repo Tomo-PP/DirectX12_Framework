@@ -15,10 +15,12 @@ struct VSInput{
  *******************************************************/
 struct VSOutput{
 	
-    float4 Position : SV_POSITION;  // 頂点座標（射影座標に変換済み）
-	float2 TexCoord : TEXCOORD;     // uv座標
-	float3 Normal   : NORMAL;       // 法線ベクトル
-    float3 Tangent  : TANGENT;      // 接戦ベクトル
+    float4   Position  : SV_POSITION;  // 頂点座標（射影座標に変換済み）
+	float2   TexCoord  : TEXCOORD;     // uv座標
+    float4   WorldPos  : WORLD_POS;    // ワールド空間での座標
+    float3   CameraPos : CAMERA_POS;   // カメラ座標
+    
+    float3x3 InvTangentBasis : INV_TANGENT_BASIS;  // 接線空間への規定変換行列の逆行列（接線空間をワールド空間に変換）
 };
 
 
@@ -52,9 +54,19 @@ VSOutput main( VSInput input){
     float4 viewPos    = mul(View,      worldPos);       // ワールド座標からビュー座標に変換
     float4 projectPos = mul(Projection, viewPos);       // ビュー座標から射影座標に変換
 	
-    output.Position = projectPos;
-    output.TexCoord = input.TexCoord;
-	output.Normal   = input.Normal;
+    output.Position  = projectPos;
+    output.TexCoord  = input.TexCoord;
+    output.WorldPos  = worldPos;
+    output.CameraPos = float3(View[0][0], View[0][1], View[0][2]); // View行列の１行目がカメラ座標
+    
+    // 基底ベクトルの計算（ワールド行列でワールド空間に変換後正規化）
+    float3 N = normalize(mul((float3x3)World, input.Normal));
+    float3 T = normalize(mul((float3x3)World, input.Tangent));
+    // 残りの１つは外積で求める
+    float3 B = normalize(cross(N, T));
 	
+    // 接線空間への変換行列の逆行列を計算
+    output.InvTangentBasis = transpose(float3x3(T, B, N));
+    
 	return output;
 }

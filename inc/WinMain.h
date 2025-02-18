@@ -13,9 +13,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 
-#include <wrl.h>
-
-#include <DirectXMath.h>
+#include <SimpleMath.h>
 #include <d3dcompiler.h>
 #include "ResourceUploadBatch.h"
 #include "DDSTextureLoader.h"
@@ -23,6 +21,14 @@
 #include "FileUtil.h"
 #include "Mesh.h"
 #include "DescriptorManager.h"
+#include "ComPtr.h"
+
+
+// imgui用
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx12.h"
+
 
 
 /****************************************************************
@@ -34,10 +40,21 @@
 #pragma comment( lib, "d3dcompiler.lib" )
 
 
-/****************************************************************
- * ComPtr（スマートポインタ）
- ****************************************************************/
-using namespace Microsoft::WRL;
+/*****************************************************************
+ * using namespace SimpleMath
+ *****************************************************************/
+using namespace DirectX::SimpleMath;
+
+
+/*****************************************************************
+ * LightBuffer 構造体
+ *****************************************************************/
+struct LightBuffer {
+
+	// Vector4にしているのは packoffsetで扱いやすくするため（16Byteだから）
+	Vector4 LightPosition;  /* ライトの座標 */
+	Color   LightColor;     /* ライトの色 */
+};
 
 
 /****************************************************************
@@ -50,10 +67,11 @@ struct alignas(256) Transform {
 	DirectX::XMMATRIX Projection;  /* 射影行列 */
 };
 
+
 /****************************************************************
- * テクスチャ　構造体
+ * テクスチャのビュー 構造体
  ****************************************************************/
-struct Texture {
+struct TextureView {
 
 	ComPtr<ID3D12Resource>      pResource;  /* リソース */
 	D3D12_CPU_DESCRIPTOR_HANDLE HandleCPU;  /* CPUのディスクリプタに対するハンドル */
@@ -132,19 +150,17 @@ private:
 
 	/* Heap */
 	ComPtr<ID3D12DescriptorHeap>       m_pHeapCBV_SRV_UAV;           /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
-
-	/* Descriptor */
-	ComPtr<ID3D12Resource>             m_pColorBuffer[FrameCount];   /* カラーバッファ（バックバッファ）、フレーム数分必要（今回はダブルバッファリングなので２個） */
-	ComPtr<ID3D12Resource>             m_pDSB;                       /* 深度ステンシルバッファ */
 	
 	ComPtr<ID3D12Resource>             m_pVB;                        /* 頂点バッファ */
 	ComPtr<ID3D12Resource>             m_pIB;                        /* インデックスバッファ */
 
-	ComPtr<ID3D12Resource>             m_pCB[FrameCount * 2];        /* 定数バッファ（バックバッファの数×モデルの数分必要）*/
+	ComPtr<ID3D12Resource>             m_pCB[4];        /* 定数バッファ（変換行列×２＋ライトバッファ＋マテリアル＝４）*/
 
 
-	ConstantBufferView<Transform> m_CBV[FrameCount * 2];  /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
-	Texture                       m_Texture;              /* テクスチャのデータを保存 */
+	ConstantBufferView<Transform> m_CBV[FrameCount];      /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
+	ConstantBufferView<Material>  m_Material;             /* マテリアルのデータを保存 */
+	TextureView                   m_Texture;              /* テクスチャのデータを保存 */
+	TextureView                   NormalMapSRV;           /* 法線マップのテクスチャデータを保存 */
 
 	/*****************************************************************
 	 * 描画用インターフェイスのメンバ変数
@@ -152,9 +168,6 @@ private:
 	ComPtr<ID3D12RootSignature>  m_pRootSignature;      /* ルートシグネチャ */
 	ComPtr<ID3D12PipelineState>  m_pPSO;                /* パイプラインステート */
 	
-
-	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleRTV[FrameCount];  /* レンダーターゲットビュー用CPUディスクリプターハンドル */
-	D3D12_CPU_DESCRIPTOR_HANDLE   m_HandleDSV;             /* 深度ステンシルバッファビュー用のハンドル（ディスクリプタヒープの先頭ポインタ）*/
 	D3D12_VIEWPORT                m_Viewport;              /* ビューポート */
 	D3D12_RECT                    m_Scissor;               /* シザー矩形 */
 
@@ -162,8 +175,31 @@ private:
 	/*****************************************************************
 	 * メッシュ用変数
 	 *****************************************************************/
-	std::vector<Mesh>        m_meshes;   /* メッシュ情報（複数定義できるように可変配列）*/
-	std::vector<Material> m_materials;   /* マテリアル情報 */
+	std::vector<Mesh>        m_meshes;     /* メッシュ情報（複数定義できるように可変配列）*/
+	std::vector<Material>    m_materials;  /* マテリアル情報 */
+
+
+	/*****************************************************************
+	 * ライト用変数
+	 *****************************************************************/
+	ConstantBufferView<LightBuffer> m_LightCBV;
+
+
+	/*****************************************************************
+	 * Imgui用変数や関数
+	 *****************************************************************/
+	ComPtr<ID3D12DescriptorHeap> m_pHeapForImgui;  // ヒープ保持用
+
+	bool Init_Imgui();                             // imguiの初期化
+
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeapForImgui();  // imguiのディスクリプタヒープの作成
+	ComPtr<ID3D12DescriptorHeap> GetHeapForImgui();               // 他から参照できるようにする関数
+
+	// Imguiの描画
+	void ImguiRender();
+
+	// Imguiの終了処理
+	void Term_Imgui();
 
 public:
 
