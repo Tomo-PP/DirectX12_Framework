@@ -442,7 +442,7 @@ bool App::OnInit() {
 		D3D12_RESOURCE_DESC resourceDesc = {};
 		resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;  /* 扱うリソースの次元を設定（頂点バッファなので *BUFFERを指定）*/
 		resourceDesc.Alignment          = 0;                                /* メモリの区切る量 *BUFFERの場合は 64 KBまたは 0を指定 */
-		resourceDesc.Width              = VertexSize;                       /* 頂点情報が入るサイズのバッファサイズ（テクスチャの場合は横幅を指定）*/
+		resourceDesc.Width              = UINT64(VertexSize);               /* 頂点情報が入るサイズのバッファサイズ（テクスチャの場合は横幅を指定）*/
 		resourceDesc.Height             = 1;                                /* バッファの場合は１（テクスチャの場合は縦幅を指定）*/
 		resourceDesc.DepthOrArraySize   = 1;                                /* リソースの奥行（バッファ・テクスチャは１、三次元テクスチャは奥行）*/
 		resourceDesc.MipLevels          = 1;                                /* ミップマップのレベルの設定（バッファの場合は１） */
@@ -665,10 +665,13 @@ bool App::OnInit() {
 			auto aspect = static_cast<float>(m_Width) / static_cast<float>(m_Height); /* 高さに対する幅の割合 */
 
 			// 変換行列の設定
-			m_CBV[i].pBuffer->World = DirectX::XMMatrixIdentity();                                          /* ワールド行列・Identityは単位行列 */
+			m_CBV[i].pBuffer->World = DirectX::XMMatrixIdentity() * DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f);                                          /* ワールド行列・Identityは単位行列 */
 			m_CBV[i].pBuffer->View = DirectX::XMMatrixLookAtRH(eyePos, targetPos, upward);                  /* カメラ行列 */
 			m_CBV[i].pBuffer->Projection = DirectX::XMMatrixPerspectiveFovRH(fovY, aspect, 1.0f, 1000.0f);  /* 射影行列 */
 		}
+
+		m_CBV[0].pBuffer->World *= DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f);
+		m_CBV[1].pBuffer->World *= DirectX::XMMatrixScaling(0.5f, 0.5f, 0.5f);
 	}
 
 
@@ -1257,9 +1260,9 @@ void App::Update() {
 	rotate += 0.015f;
 
 	// １つ目のポリゴン
-	m_CBV[m_FrameIndex].pBuffer->World =
-		DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(20.0f)) *
-		DirectX::XMMatrixRotationY(rotate + DirectX::XMConvertToRadians(45.0f));
+	m_CBV[m_FrameIndex].pBuffer->World *=
+		DirectX::XMMatrixRotationX(DirectX::XMConvertToRadians(1.0f)) *
+		DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(1.0f));
 
 }
 
@@ -1527,8 +1530,7 @@ void App::TermDirect3D() {
 
 
 	// RTV・DSVの破棄
-	m_DespManager.TermDSV();
-	m_DespManager.TermRTV();
+	m_DespManager.Term();
 
 
 	// コマンドリストの破棄
@@ -1555,6 +1557,7 @@ void App::TermDirect3D() {
 
 #if defined (DEBUG) || defined (_DEBUG)
 
+	/* このレポートがデバイスを参照しているので以下のレポートにはDeviceが破棄されていないと出る */
 	debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
 	debugDevice.Reset();
 #endif

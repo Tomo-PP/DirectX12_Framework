@@ -8,10 +8,12 @@
 
 
 DescriptorManager::DescriptorManager():
-	m_pHeapRTV  (nullptr),
-	m_pHeapDSV  (nullptr),
-	m_HandleRTV (),
-	m_HandleDSV ()
+	m_pHeapRTV         (nullptr),
+	m_pHeapDSV         (nullptr),
+	m_pHeapCBV_SRV_UAV (nullptr),
+	m_HandleRTV        (),
+	m_HandleDSV        (),
+	m_HeapCount        (0)
 { /* DO_NOTHING */ }
 
 
@@ -30,9 +32,9 @@ bool DescriptorManager::CreateRTV(ID3D12Device* pDevice, IDXGISwapChain3* pSwapC
 
 	// ディスクリプタヒープの設定
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-	desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;             /* RTVを設定 */
-	desc.NumDescriptors = _FrameCount;                                /* ディスクリプタの数（フレームの数分）*/
-	desc.NodeMask       = 0;                                          /* 複数のGPUはない */
+	desc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;   /* RTVを設定 */
+	desc.NumDescriptors = _FrameCount;                      /* ディスクリプタの数（フレームの数分）*/
+	desc.NodeMask       = 0;                                /* 複数のGPUはない */
 	desc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;  /* シェーダーからアクセス可能 */
 
 
@@ -184,6 +186,59 @@ bool DescriptorManager::CreateDSV(ID3D12Device* pDevice, uint32_t Width, uint32_
 }
 
 
+bool DescriptorManager::CreateCBV(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap, ConstantBuffer* pCBV, size_t size) {
+
+	if (pDevice == nullptr || pHeap == nullptr || pCBV == nullptr || size == 0) {
+
+		std::cout << "CreateCBV Error : 引数が無効な値" << std::endl;
+		return false;
+	}
+
+	// CBVの生成
+	if (!pCBV->Init(pDevice, pHeap, size, m_HeapCount)) {
+
+		std::cout << "Create Error : CBVの生成エラー" << std::endl;
+		return false;
+	}
+
+	// 生成カウント
+	AddCount();
+
+	
+	return true;
+}
+
+
+bool DescriptorManager::CreateSRV(
+	ID3D12Device*                 pDevice, 
+	ID3D12DescriptorHeap*         pHeap, 
+	Texture*                      pSRV, 
+	const wchar_t*                filename,
+	DirectX::ResourceUploadBatch& batch)
+{
+
+	if (pDevice == nullptr || pHeap == nullptr) {
+
+		std::cout << "Error : 引数の nullptrエラー" << std::endl;
+		return false;
+	}
+
+
+	// SRVの作成
+	if (!pSRV->Init(pDevice, pHeap, filename, batch, m_HeapCount)) {
+
+		std::cout << "Create Error : SRVの生成エラー" << std::endl;
+		return false;
+	}
+
+	// 生成カウント
+	AddCount();
+
+
+	return true;
+}
+
+
 D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle_RTV(const uint32_t FrameIndex) const{
 
 	if (m_pHeapRTV == nullptr) {
@@ -205,6 +260,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle_DSV() const{
 	return m_HandleDSV;
 }
 
+
+size_t DescriptorManager::GetCount() const {
+
+	return m_HeapCount;
+}
+
+
+void DescriptorManager::Term() {
+
+	TermRTV();
+	TermDSV();
+	m_HeapCount = 0;
+}
 
 
 void DescriptorManager::TermRTV() {

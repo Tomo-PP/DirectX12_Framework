@@ -5,12 +5,11 @@
 #include "Object.h"
 
 
-Object::Object():
-	Pos   (DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f))
-{
-
-
-}
+Object::Object(DirectX::XMFLOAT3 Position):
+	Pos   (Position),
+	m_VBV (),
+	m_IBV ()
+{ /* DO_NOTHING */ }
 
 
 Object::~Object() {
@@ -19,10 +18,17 @@ Object::~Object() {
 }
 
 
-void Object::Init() {
+void Object::Init(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap) {
 
+	
+	
 
+	// èâÇﬂÇÃà íuÇ∆âÒì]Çê›íË
+	void* World = m_Transform[0].GetMapBuf();
+	Transform* pWorld = reinterpret_cast<Transform*>(World);
+	pWorld->World *= DirectX::XMMatrixTranslation(Pos.x, Pos.y, Pos.z);
 }
+
 
 
 void Object::Term() {

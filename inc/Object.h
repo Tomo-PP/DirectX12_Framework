@@ -6,6 +6,9 @@
 #include <DirectXMath.h>
 #include "Mesh.h"
 #include "ComPtr.h"
+#include "ConstantBuffer.h"
+#include "Texture.h"
+#include "SimpleMath.h"
 
 
 /****************************************************************
@@ -15,16 +18,19 @@ class Object {
 
 private:
 
-	DirectX::XMFLOAT3          Pos;      /* 座標 */
-	Mesh                       m_mesh;   /* メッシュ情報 */
-	D3D12_VERTEX_BUFFER_VIEW   m_VBV;    /* 頂点バッファビュー */
-	D3D12_INDEX_BUFFER_VIEW    m_IBV;    /* インデックスバッファビュー */
-
-	
+	DirectX::XMFLOAT3          Pos;             /* 座標 */
+	Mesh                       m_mesh;          /* メッシュ情報 */
+	D3D12_VERTEX_BUFFER_VIEW   m_VBV;           /* 頂点バッファビュー */
+	D3D12_INDEX_BUFFER_VIEW    m_IBV;           /* インデックスバッファビュー */
+	ConstantBuffer             m_Transform[2];  /* 変換行列 */
+	ConstantBuffer             m_Light;         /* ライト */
+	ConstantBuffer             m_Material;      /* マテリアル */
+	Texture                    m_DiffuseMap;    /* ディフューズマップ */
+	Texture                    m_NormalMap;     /* 法線マップ */
 
 public:
 
-	Object();
+	Object(DirectX::XMFLOAT3 Position);
 
 	~Object();
 
@@ -32,7 +38,7 @@ public:
 	/****************************************************************
 	 * 初期化処理
 	 ****************************************************************/
-	virtual void Init();
+	virtual void Init(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap);
 
 
 	/****************************************************************
