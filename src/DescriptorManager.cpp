@@ -186,6 +186,26 @@ bool DescriptorManager::CreateDSV(ID3D12Device* pDevice, uint32_t Width, uint32_
 }
 
 
+bool DescriptorManager::Init_CBV_SRV_UAV(ID3D12Device* pDevice, size_t HeapSize) {
+
+	// ディスクリプタヒープの設定
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;     /* 定数バッファを含んだフラグを指定 */
+	heapDesc.NumDescriptors = 10;                                         /* ディスクリプタの数 */
+	heapDesc.NodeMask       = 0;                                          /* GPUは１つなので０を指定 */
+	heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;  /* シェーダー側から参照できるようにする */
+
+	// ディスクリプタヒープの生成
+	HRESULT hr = pDevice->CreateDescriptorHeap(
+		&heapDesc,
+		IID_PPV_ARGS(m_pHeapCBV_SRV_UAV.GetAddressOf()));
+	if (FAILED(hr)) {
+
+		return false;
+	}
+}
+
+
 bool DescriptorManager::CreateCBV(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap, ConstantBuffer* pCBV, size_t size) {
 
 	if (pDevice == nullptr || pHeap == nullptr || pCBV == nullptr || size == 0) {
@@ -261,17 +281,13 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle_DSV() const{
 }
 
 
-size_t DescriptorManager::GetCount() const {
-
-	return m_HeapCount;
-}
-
-
 void DescriptorManager::Term() {
 
 	TermRTV();
 	TermDSV();
 	m_HeapCount = 0;
+
+	m_pHeapCBV_SRV_UAV.Reset();
 }
 
 

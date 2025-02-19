@@ -98,3 +98,14 @@ void Texture::Term() {
 	m_HandleGPU.ptr = 0;
 
 }
+
+
+D3D12_GPU_DESCRIPTOR_HANDLE Texture::GetHandleGPU() const {
+
+	if (m_HandleGPU.ptr == 0) {
+
+		return D3D12_GPU_DESCRIPTOR_HANDLE();
+	}
+
+	return m_HandleGPU;
+}

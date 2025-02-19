@@ -12,6 +12,7 @@
  * Include
  **************************************************************/
 #include "WinMain.h"
+#include "define.h"
 
 
 /**************************************************************
@@ -32,7 +33,7 @@ int main() {
 
 
 	// DirectX12ÇÃé¿çs
-	App app(960, 540, L"DirectX12");
+	App app(WINDOW_WIDTH, WINDOW_HEIGHT, L"DirectX12");
 	app.Run();
 
 	return 0;

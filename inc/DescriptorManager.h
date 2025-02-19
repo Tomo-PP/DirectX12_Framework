@@ -89,9 +89,19 @@ public:
 
 
 	/****************************************************************
+	 * CBV_SRV_UAVのディスクリプタヒープの生成
+	 ****************************************************************/
+	bool Init_CBV_SRV_UAV(ID3D12Device* pDevice, size_t HeapSize);
+
+
+	/****************************************************************
 	 * CBVの作成
 	 ****************************************************************/
-	bool CreateCBV(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap, ConstantBuffer* pCBV, size_t size);
+	bool CreateCBV(
+		ID3D12Device*         pDevice,
+		ID3D12DescriptorHeap* pHeap,
+		ConstantBuffer*       pCBV,
+		size_t                size);
 
 
 	/****************************************************************
@@ -119,11 +129,11 @@ public:
 	{ return m_pRTB[FrameIndex].Get(); };
 
 
-
 	/****************************************************************
-	 * カウントの取得
+	 * ディスクリプタヒープの取得
 	 ****************************************************************/
-	size_t GetCount() const;
+	ID3D12DescriptorHeap* GetHeapCBV_SRV_UAV()
+	{ return m_pHeapCBV_SRV_UAV.Get(); }
 
 
 	/****************************************************************

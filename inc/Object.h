@@ -4,11 +4,25 @@
  ****************************************************************/
 #include <d3d12.h>
 #include <DirectXMath.h>
+#include <string>
 #include "Mesh.h"
 #include "ComPtr.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
 #include "ConstantBuffer.h"
 #include "Texture.h"
 #include "SimpleMath.h"
+#include "FileUtil.h"
+#include "DescriptorManager.h"
+
+/****************************************************************
+ * クラス
+ ****************************************************************/
+class VerteBuffer;
+class IndexBuffer;
+class ConstantBuffer;
+class Texture;
+class DescriptorManaer;
 
 
 /****************************************************************
@@ -19,9 +33,9 @@ class Object {
 private:
 
 	DirectX::XMFLOAT3          Pos;             /* 座標 */
-	Mesh                       m_mesh;          /* メッシュ情報 */
-	D3D12_VERTEX_BUFFER_VIEW   m_VBV;           /* 頂点バッファビュー */
-	D3D12_INDEX_BUFFER_VIEW    m_IBV;           /* インデックスバッファビュー */
+	VertexBuffer               m_VB;            /* 頂点バッファ */
+	IndexBuffer                m_IB;            /* インデックスバッファ */
+
 	ConstantBuffer             m_Transform[2];  /* 変換行列 */
 	ConstantBuffer             m_Light;         /* ライト */
 	ConstantBuffer             m_Material;      /* マテリアル */
@@ -29,6 +43,8 @@ private:
 	Texture                    m_NormalMap;     /* 法線マップ */
 
 public:
+
+	Object();
 
 	Object(DirectX::XMFLOAT3 Position);
 
@@ -38,7 +54,11 @@ public:
 	/****************************************************************
 	 * 初期化処理
 	 ****************************************************************/
-	virtual void Init(ID3D12Device* pDevice, ID3D12DescriptorHeap* pHeap);
+	virtual bool Init(
+		ID3D12Device*       pDevice,
+		ID3D12CommandQueue* pCmdQueue,
+		DescriptorManager*  DespManager,
+		std::wstring        filename);
 
 
 	/****************************************************************
@@ -56,5 +76,5 @@ public:
 	/****************************************************************
 	 * 描画処理
 	 ****************************************************************/
-	virtual void Render(ID3D12GraphicsCommandList* pCmdList);
+	virtual void Render(ID3D12GraphicsCommandList* pCmdList, uint32_t FrameIndex);
 };

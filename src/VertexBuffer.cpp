@@ -17,7 +17,7 @@ VertexBuffer::~VertexBuffer()
 { /* DO_NOTHING */ }
 
 
-bool VertexBuffer::Init(ID3D12Device* pDevice, size_t size, const Mesh* m_mesh) {
+bool VertexBuffer::Init(ID3D12Device* pDevice, const Mesh* mesh) {
 
 	if (pDevice == nullptr) {
 
@@ -35,8 +35,8 @@ bool VertexBuffer::Init(ID3D12Device* pDevice, size_t size, const Mesh* m_mesh) 
 
 
 	// バッファサイズを決定
-	auto VertexSize = sizeof(MeshVertex) * m_mesh[0].Vertices.size();  /* MeshVertex（頂点情報）× 頂点情報の数 */
-	auto vertices   = m_mesh[0].Vertices.data();                       /* マッピング用の頂点データを確保する（可変配列の先頭ポインタを取得）*/
+	auto VertexSize = sizeof(MeshVertex) * mesh->Vertices.size();  /* MeshVertex（頂点情報）× 頂点情報の数 */
+	auto vertices   = mesh->Vertices.data();                       /* マッピング用の頂点データを確保する（可変配列の先頭ポインタを取得）*/
 
 	// リソースの設定
 	D3D12_RESOURCE_DESC resourceDesc = {};
