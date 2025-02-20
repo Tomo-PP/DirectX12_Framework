@@ -29,15 +29,16 @@ bool IndexBuffer::Init(ID3D12Device* pDevice, const Mesh* mesh) {
 
 
 	// インデックスバッファのサイズを決定
-	m_IndexCount   = sizeof(uint32_t) * mesh->Indices.size();  /* インデックスはuint32_t型 × インデックスの数 */
-	auto indices   = mesh->Indices.data();                     /* マッピング用インデックスデータの先頭ポインタを取得 */
+	m_IndexCount = mesh->Indices.size();
+	auto IndexSize = sizeof(uint32_t) * m_IndexCount;  /* インデックスはuint32_t型 × インデックスの数 */
+	auto indices   = mesh->Indices.data();             /* マッピング用インデックスデータの先頭ポインタを取得 */
 
 
 	// リソースの設定
 	D3D12_RESOURCE_DESC resourceDesc = {};
 	resourceDesc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;  /* 扱うリソースの次元を設定（頂点バッファなので *BUFFERを指定）*/
 	resourceDesc.Alignment          = 0;                                /* メモリの区切る量 *BUFFERの場合は 64 KBまたは 0を指定 */
-	resourceDesc.Width              = m_IndexCount;                     /* インデックス情報が入るサイズのバッファサイズ（テクスチャの場合は横幅を指定）*/
+	resourceDesc.Width              = IndexSize;                        /* インデックス情報が入るサイズのバッファサイズ（テクスチャの場合は横幅を指定）*/
 	resourceDesc.Height             = 1;                                /* バッファの場合は１（テクスチャの場合は縦幅を指定）*/
 	resourceDesc.DepthOrArraySize   = 1;                                /* リソースの奥行（バッファ・テクスチャは１、三次元テクスチャは奥行）*/
 	resourceDesc.MipLevels          = 1;                                /* ミップマップのレベルの設定（バッファの場合は１） */
@@ -72,7 +73,7 @@ bool IndexBuffer::Init(ID3D12Device* pDevice, const Mesh* mesh) {
 	}
 
 	// インデックスデータをGPUメモリにコピーする
-	memcpy(ptr, indices, m_IndexCount);
+	memcpy(ptr, indices, IndexSize);
 
 
 	// マッピングの解除
@@ -82,7 +83,10 @@ bool IndexBuffer::Init(ID3D12Device* pDevice, const Mesh* mesh) {
 	// インデックスバッファビューの設定
 	m_IBV.BufferLocation = m_pIB->GetGPUVirtualAddress();    /* インデックスバッファのGPUメモリ */
 	m_IBV.Format         = DXGI_FORMAT_R32_UINT;             /* フォーマット（ポリゴン数が多い場合 *R32_UINT ポリゴン数が少ない場合 *R16_UINT） */
-	m_IBV.SizeInBytes    = static_cast<UINT>(m_IndexCount);  /* インデックスデータのデータサイズ（バイト）*/
+	m_IBV.SizeInBytes    = static_cast<UINT>(IndexSize);     /* インデックスデータのデータサイズ（バイト）*/
+
+	// 正常終了
+	return true;
 }
 
 
@@ -98,7 +102,7 @@ void IndexBuffer::Term() {
 }
 
 
-D3D12_INDEX_BUFFER_VIEW IndexBuffer::GetIBV() const {
+D3D12_INDEX_BUFFER_VIEW IndexBuffer::GetIBV() {
 
 	return m_IBV;
 }

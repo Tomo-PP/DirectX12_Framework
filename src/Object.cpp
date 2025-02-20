@@ -47,10 +47,16 @@ bool Object::Init(
 
 
 	// VB・IBの生成
-	m_VB.Init(pDevice, &resMesh[0]);
-	m_IB.Init(pDevice, &resMesh[0]);
+	if (!m_VB.Init(pDevice, &resMesh[0])) {
 
-	std::cout << "CBV開始" << std::endl;
+		return false;
+	}
+	if (!m_IB.Init(pDevice, &resMesh[0])) {
+
+		return false;
+	}
+
+
 	// CBVの生成
 	for (auto i = 0u; i < _countof(m_Transform); i++) {
 
@@ -64,15 +70,16 @@ bool Object::Init(
 		auto targetPos = DirectX::XMVectorZero();                          /* 注視点座標（原点）*/
 		auto upward    = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);     /* カメラの高さ */
 
-		constexpr auto fovY   = DirectX::XMConvertToRadians(37.5f);                                     /* カメラの Y軸に対する画角 */
+		constexpr auto fovY   = DirectX::XMConvertToRadians(37.5f);                           /* カメラの Y軸に対する画角 */
 		auto aspect = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT);   /* 高さに対する幅の割合 */
 		
-		void* ptr = m_Transform[0].GetMapBuf();
+		void* ptr = m_Transform[i].GetMapBuf();
 		Transform* transform = reinterpret_cast<Transform*>(ptr);
 		transform->World      = DirectX::XMMatrixIdentity();
 		transform->View       = DirectX::XMMatrixLookAtRH(eyePos, targetPos, upward);
 		transform->Projection = DirectX::XMMatrixPerspectiveFovRH(fovY, aspect, 1.0f, 1000.0f);
 	}
+
 
 
 	// ライトの生成
@@ -92,7 +99,7 @@ bool Object::Init(
 
 		return false;
 	}
-	ptr = m_Transform[0].GetMapBuf();
+	ptr = m_Material.GetMapBuf();
 	Material* material = reinterpret_cast<Material*>(ptr);
 	material->Diffuse    = resMaterial[0].Diffuse;
 	material->alpha      = resMaterial[0].alpha;
@@ -127,9 +134,9 @@ bool Object::Init(
 	// 初めの位置と回転を設定
 	for (auto i = 0; i < _countof(m_Transform); i++) {
 
-		void* World = m_Transform[0].GetMapBuf();
+		void* World = m_Transform[i].GetMapBuf();
 		Transform* pWorld = reinterpret_cast<Transform*>(World);
-		pWorld->World *= DirectX::XMMatrixTranslation(Pos.x, Pos.y, Pos.z);
+		pWorld->World *= DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f);
 	}
 
 	return true;
@@ -162,24 +169,27 @@ void Object::Term() {
 
 
 
-void Object::Update() {
+void Object::Update(uint32_t FrameIndex) {
 	
-
+	void* ptr = m_Transform[FrameIndex].GetMapBuf();
+	Transform* pWorld = reinterpret_cast<Transform*>(ptr);
+	pWorld->World *= DirectX::XMMatrixRotationZ(0.01f);
 }
 
 
 void Object::Render(ID3D12GraphicsCommandList* pCmdList, uint32_t FrameIndex) {
 
 	// テクスチャ・頂点
-	auto VB = m_VB.GetVBV();
-	auto IB = m_IB.GetIBV();
-	pCmdList->IASetVertexBuffers(0, 1, &VB);                                                     /* 頂点のセット */
-	pCmdList->IASetIndexBuffer(&IB);                                                             /* インデックスのセット */
 	pCmdList->SetGraphicsRootConstantBufferView(0, m_Transform[FrameIndex].GetVirtualAddress()); /* 変換行列のセット */
 	pCmdList->SetGraphicsRootConstantBufferView(1, m_Light.GetVirtualAddress());                 /* ライトをセット */
 	pCmdList->SetGraphicsRootConstantBufferView(2, m_Material.GetVirtualAddress());              /* マテリアルのセット */
 	pCmdList->SetGraphicsRootDescriptorTable(3, m_DiffuseMap.GetHandleGPU());                    /* ディフューズマップのセット */
 	pCmdList->SetGraphicsRootDescriptorTable(4, m_NormalMap.GetHandleGPU());                     /* 法線マップのセット */
-	pCmdList->DrawIndexedInstanced(m_IB.GetIndexNum(), 1, 0, 0, 0);                              /* メッシュの描画コマンド */
+	auto VBV = m_VB.GetVBV();
+	auto IBV = m_IB.GetIBV();
+	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pCmdList->IASetVertexBuffers(0, 1, &VBV);                                                     /* 頂点のセット */
+	pCmdList->IASetIndexBuffer(&IBV);                                                             /* インデックスのセット */
+	pCmdList->DrawIndexedInstanced(m_IB.GetIndexNum(), 1, 0, 0, 0);                               /* メッシュの描画コマンド */
 }
 

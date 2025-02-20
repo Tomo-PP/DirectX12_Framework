@@ -3,7 +3,6 @@
  * Include
  ****************************************************************/
 #include "DescriptorManager.h"
-#include <iostream>
 
 
 
@@ -213,6 +212,7 @@ bool DescriptorManager::CreateCBV(ID3D12Device* pDevice, ID3D12DescriptorHeap* p
 		std::cout << "CreateCBV Error : ˆø”‚ª–³Œø‚È’l" << std::endl;
 		return false;
 	}
+
 
 	// CBV‚Ì¶¬
 	if (!pCBV->Init(pDevice, pHeap, size, m_HeapCount)) {

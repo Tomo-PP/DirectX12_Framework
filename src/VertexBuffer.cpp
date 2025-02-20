@@ -87,6 +87,9 @@ bool VertexBuffer::Init(ID3D12Device* pDevice, const Mesh* mesh) {
 	m_VBV.BufferLocation = m_pVB->GetGPUVirtualAddress();                          /* 先ほどマップしたGPUの仮想アドレスを記憶 */
 	m_VBV.SizeInBytes    = static_cast<UINT>(VertexSize);                          /* 頂点データ全体のサイズを記憶 */
 	m_VBV.StrideInBytes  = static_cast<UINT>(sizeof(MeshVertex));                  /* １頂点辺りのサイズを記憶 */
+
+	// 正常終了
+	return true;
 }
 
 
@@ -102,7 +105,7 @@ void VertexBuffer::Term() {
 }
 
 
-D3D12_VERTEX_BUFFER_VIEW VertexBuffer::GetVBV() const {
+D3D12_VERTEX_BUFFER_VIEW VertexBuffer::GetVBV(){
 
 	return m_VBV;
 }

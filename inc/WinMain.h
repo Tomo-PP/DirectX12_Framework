@@ -58,6 +58,12 @@ struct TextureView {
 	D3D12_GPU_DESCRIPTOR_HANDLE HandleGPU;  /* GPUのディスクリプタに対するハンドル */
 };
 
+struct LightBuffer {
+
+	Vector4 LightPosition;
+	Color   LightColor;
+};
+
 
 /****************************************************************
  * 定数バッファビュー 構造体
@@ -125,22 +131,22 @@ private:
 	DescriptorManager             m_DespManager;               /* ディスクリプタヒープの管理クラス */
 
 	 /* VBVと IBVは特殊 */
-	//D3D12_VERTEX_BUFFER_VIEW      m_VBV;                             /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
-	//D3D12_INDEX_BUFFER_VIEW       m_IBV;                             /* インデックスバッファビュー */
+	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                             /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
+	D3D12_INDEX_BUFFER_VIEW       m_IBV;                             /* インデックスバッファビュー */
 
 	/* Heap */
-	//ComPtr<ID3D12DescriptorHeap>       m_pHeapCBV_SRV_UAV;           /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
+	ComPtr<ID3D12DescriptorHeap>       m_pHeapCBV_SRV_UAV;           /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
 	
-	//ComPtr<ID3D12Resource>             m_pVB;                        /* 頂点バッファ */
-	//ComPtr<ID3D12Resource>             m_pIB;                        /* インデックスバッファ */
+	ComPtr<ID3D12Resource>             m_pVB;                        /* 頂点バッファ */
+	ComPtr<ID3D12Resource>             m_pIB;                        /* インデックスバッファ */
 
-	//ComPtr<ID3D12Resource>             m_pCB[4];        /* 定数バッファ（変換行列×２＋ライトバッファ＋マテリアル＝４）*/
+	ComPtr<ID3D12Resource>             m_pCB[4];        /* 定数バッファ（変換行列×２＋ライトバッファ＋マテリアル＝４）*/
 
 
-	//ConstantBufferView<Transform> m_CBV[FrameCount];      /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
-	//ConstantBufferView<Material>  m_Material;             /* マテリアルのデータを保存 */
-	//TextureView                   m_Texture;              /* テクスチャのデータを保存 */
-	//TextureView                   NormalMapSRV;           /* 法線マップのテクスチャデータを保存 */
+	ConstantBufferView<Transform> m_CBV[FrameCount];      /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
+	ConstantBufferView<Material>  m_Material;             /* マテリアルのデータを保存 */
+	TextureView                   m_Texture;              /* テクスチャのデータを保存 */
+	TextureView                   NormalMapSRV;           /* 法線マップのテクスチャデータを保存 */
 
 	/*****************************************************************
 	 * 描画用インターフェイスのメンバ変数
@@ -155,14 +161,14 @@ private:
 	/*****************************************************************
 	 * メッシュ用変数
 	 *****************************************************************/
-	//std::vector<Mesh>        m_meshes;     /* メッシュ情報（複数定義できるように可変配列）*/
-	//std::vector<Material>    m_materials;  /* マテリアル情報 */
+	std::vector<Mesh>        m_meshes;     /* メッシュ情報（複数定義できるように可変配列）*/
+	std::vector<Material>    m_materials;  /* マテリアル情報 */
 
 
 	/*****************************************************************
 	 * ライト用変数
 	 *****************************************************************/
-	//ConstantBufferView<LightBuffer> m_LightCBV;
+	ConstantBufferView<LightBuffer> m_LightCBV;
 
 
 	/*****************************************************************

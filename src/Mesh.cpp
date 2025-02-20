@@ -198,6 +198,7 @@ void MeshLoader::ParseMesh(Mesh& dstMesh, const aiMesh* pSrcMesh) {
 
 	// 頂点数だけ事前確保
 	dstMesh.Vertices.resize(pSrcMesh->mNumVertices);
+	std::cout << "NumVertices : " << pSrcMesh->mNumVertices << std::endl;
 
 	for (auto i = 0u; i < pSrcMesh->mNumVertices; i++) {
 
@@ -220,6 +221,7 @@ void MeshLoader::ParseMesh(Mesh& dstMesh, const aiMesh* pSrcMesh) {
 	/* インデックス情報について */
 
 	// 頂点インデックスのメモリを確保（一つのポリゴンに頂点は３つなので ×３を計算）
+	std::cout << "NumFaces : " << pSrcMesh->mNumFaces << std::endl;
 	dstMesh.Indices.resize(pSrcMesh->mNumFaces * 3);
 
 	for (auto i = 0u; i < pSrcMesh->mNumFaces; i++) {
