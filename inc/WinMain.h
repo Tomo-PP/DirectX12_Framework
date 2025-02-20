@@ -47,37 +47,6 @@
 using namespace DirectX::SimpleMath;
 
 
-
-/****************************************************************
- * テクスチャのビュー 構造体
- ****************************************************************/
-struct TextureView {
-
-	ComPtr<ID3D12Resource>      pResource;  /* リソース */
-	D3D12_CPU_DESCRIPTOR_HANDLE HandleCPU;  /* CPUのディスクリプタに対するハンドル */
-	D3D12_GPU_DESCRIPTOR_HANDLE HandleGPU;  /* GPUのディスクリプタに対するハンドル */
-};
-
-struct LightBuffer {
-
-	Vector4 LightPosition;
-	Color   LightColor;
-};
-
-
-/****************************************************************
- * 定数バッファビュー 構造体
- ****************************************************************/
-template<typename T>
-struct ConstantBufferView {
-
-	D3D12_CONSTANT_BUFFER_VIEW_DESC CBVDesc;    /* 定数バッファの設定 */
-	D3D12_CPU_DESCRIPTOR_HANDLE     HandleCPU;  /* CPUディスクリプタハンドル */
-	D3D12_GPU_DESCRIPTOR_HANDLE     HandleGPU;  /* GPUディスクリプタハンドル */
-	T*                              pBuffer;    /* バッファ先頭を指すポインタ */
-};
-
-
 /****************************************************************
  * class 宣言
  ****************************************************************/
@@ -126,49 +95,14 @@ private:
 
 
 	/*****************************************************************
-	 * Descriptor関連
-	 *****************************************************************/
-	DescriptorManager             m_DespManager;               /* ディスクリプタヒープの管理クラス */
-
-	 /* VBVと IBVは特殊 */
-	D3D12_VERTEX_BUFFER_VIEW      m_VBV;                             /* 頂点バッファビュー（１モデルの頂点の塊に関する情報・モデルの数分必要）*/
-	D3D12_INDEX_BUFFER_VIEW       m_IBV;                             /* インデックスバッファビュー */
-
-	/* Heap */
-	ComPtr<ID3D12DescriptorHeap>       m_pHeapCBV_SRV_UAV;           /* ディスクリプタヒープ（定数バッファビュー・シェーダーリソースバッファビュー・アンオーダーアクセスビュー） */
-	
-	ComPtr<ID3D12Resource>             m_pVB;                        /* 頂点バッファ */
-	ComPtr<ID3D12Resource>             m_pIB;                        /* インデックスバッファ */
-
-	ComPtr<ID3D12Resource>             m_pCB[4];        /* 定数バッファ（変換行列×２＋ライトバッファ＋マテリアル＝４）*/
-
-
-	ConstantBufferView<Transform> m_CBV[FrameCount];      /* 定数バッファビュー（バックバッファの数×モデルの数分必要）*/
-	ConstantBufferView<Material>  m_Material;             /* マテリアルのデータを保存 */
-	TextureView                   m_Texture;              /* テクスチャのデータを保存 */
-	TextureView                   NormalMapSRV;           /* 法線マップのテクスチャデータを保存 */
-
-	/*****************************************************************
 	 * 描画用インターフェイスのメンバ変数
 	 *****************************************************************/
 	ComPtr<ID3D12RootSignature>  m_pRootSignature;      /* ルートシグネチャ */
 	ComPtr<ID3D12PipelineState>  m_pPSO;                /* パイプラインステート */
+	DescriptorManager            m_DespManager;         /* ディスクリプタヒープの管理クラス */
 	
 	D3D12_VIEWPORT                m_Viewport;              /* ビューポート */
 	D3D12_RECT                    m_Scissor;               /* シザー矩形 */
-
-
-	/*****************************************************************
-	 * メッシュ用変数
-	 *****************************************************************/
-	std::vector<Mesh>        m_meshes;     /* メッシュ情報（複数定義できるように可変配列）*/
-	std::vector<Material>    m_materials;  /* マテリアル情報 */
-
-
-	/*****************************************************************
-	 * ライト用変数
-	 *****************************************************************/
-	ConstantBufferView<LightBuffer> m_LightCBV;
 
 
 	/*****************************************************************
