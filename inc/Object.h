@@ -84,7 +84,7 @@ public:
 	 ****************************************************************/
 	void ModelScaling(Vector3 Scale);      /* スケール変更 */
 
-	void ModelRotation(float angle);                  /* 回転 */
+	void ModelRotation(float angle);       /* 回転 */
 
 	void ModelTranslation(Vector3 trans);  /* 平行移動 */
 

@@ -87,11 +87,11 @@ PSOutput main(VSOutput input)
     /* 反射の計算 */
     
     // 反射ベクトル
-    // float3 Reflect = normalize(-reflect(Eye, Normal));
+    float3 Reflect = normalize(-reflect(Eye, Normal));
 
     // 光度計算
-    //float bright = saturate(dot(Light, Normal));
-    float bright = 1;
+    float bright = saturate(dot(Light, Normal));
+    // float bright = 1;
     
     output.Color = float4(color.rgb * bright, color.a * Alpha);
     

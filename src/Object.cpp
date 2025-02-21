@@ -90,7 +90,7 @@ bool Object::Init(
 	}
 	void* ptr = m_Light.GetMapBuf();
 	Light* light = reinterpret_cast<Light*>(ptr);
-	light->LightPosition = Vector4(0.0f, 50.0f, 0.0f, 0.0f);
+	light->LightPosition = Vector4(10.0f, 0.0f, 0.0f, 0.0f);
 	light->LightColor    = Color(1.0f, 1.0f, 1.0f, 0.0f);
 
 
