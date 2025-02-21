@@ -8,6 +8,8 @@ Ks 0.500000 0.500000 0.500000
 Ni 1.000000
 d 1.000000
 illum 2
-map_Kd C:\Blender²\Textures\BrickRound0105_5_SPEC.png
+# テクスチャ
+map_Kd Floor/BrickRound.dds
+map_Bump Floor/BrickRoundBUMP.dds
 
 

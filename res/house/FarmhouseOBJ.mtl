@@ -3,6 +3,8 @@ illum 4
 Kd 0.50 0.50 0.50
 Ka 0.00 0.00 0.00
 Tf 1.00 1.00 1.00
-map_Kd FarmhouseTexture.dds
-bump FarmhouseTextureBumpMap.dds -bm 0.012
+map_Kd house/FarmhouseTexture.dds
+map_Bump house/FarmhouseTextureBumpMap.dds
+# NormalMap -bm 0.012
+bump house/FarmhouseTextureBumpMap.dds
 Ni 1.00

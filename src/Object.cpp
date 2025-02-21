@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "define.h"
 #include <iostream>
+#include "StrUtil.h"
 
 
 Object::Object():
@@ -105,18 +106,21 @@ bool Object::Init(
 	material->alpha      = resMaterial[0].alpha;
 	material->Specular   = resMaterial[0].Specular;
 	material->Shininess  = resMaterial[0].Shininess;
-
+	std::cout << resMaterial[0].DiffuseMap << std::endl;
+	std::cout << resMaterial[0].NormalMap << std::endl;
+	std::wstring diffusePath = MbstrToWstr(resMaterial[0].DiffuseMap.c_str());
+	std::wstring normalPath  = MbstrToWstr(resMaterial[0].NormalMap.c_str());
 
 
 	// テクスチャの生成
 	DirectX::ResourceUploadBatch batch(pDevice);
 	batch.Begin();                                        // 内部処理でコマンドアロケーターとコマンドリストが生成される
-	if (!pDespManager->CreateSRV(pDevice, pDespManager->GetHeapCBV_SRV_UAV(), &m_DiffuseMap, L"Floor/BrickRound.dds", batch)) {
+	if (!pDespManager->CreateSRV(pDevice, pDespManager->GetHeapCBV_SRV_UAV(), &m_DiffuseMap, diffusePath.c_str(), batch)) {
 
 		return false;
 	}
 	
-	if (!pDespManager->CreateSRV(pDevice, pDespManager->GetHeapCBV_SRV_UAV(), &m_NormalMap, L"Floor/BrickRoundBUMP.dds", batch)) {
+	if (!pDespManager->CreateSRV(pDevice, pDespManager->GetHeapCBV_SRV_UAV(), &m_NormalMap, normalPath.c_str(), batch)) {
 
 		return false;
 	}
@@ -129,15 +133,6 @@ bool Object::Init(
 
 	// コマンド完了まで待機
 	future.wait();
-
-
-	// 初めの位置と回転を設定
-	for (auto i = 0; i < _countof(m_Transform); i++) {
-
-		void* World = m_Transform[i].GetMapBuf();
-		Transform* pWorld = reinterpret_cast<Transform*>(World);
-		pWorld->World *= DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f);
-	}
 
 	return true;
 }
@@ -171,9 +166,7 @@ void Object::Term() {
 
 void Object::Update(uint32_t FrameIndex) {
 	
-	void* ptr = m_Transform[FrameIndex].GetMapBuf();
-	Transform* pWorld = reinterpret_cast<Transform*>(ptr);
-	pWorld->World *= DirectX::XMMatrixRotationZ(0.01f);
+	ModelRotation(0.01f);
 }
 
 
@@ -193,3 +186,50 @@ void Object::Render(ID3D12GraphicsCommandList* pCmdList, uint32_t FrameIndex) {
 	pCmdList->DrawIndexedInstanced(m_IB.GetIndexNum(), 1, 0, 0, 0);                               /* メッシュの描画コマンド */
 }
 
+
+/****************************************************************
+ * 変換行列関連
+ ****************************************************************/
+void Object::ModelScaling(Vector3 Scale) {
+
+	auto ScaleMatrix = DirectX::XMMatrixScalingFromVector(Scale);
+
+	for (auto i = 0u; i < _countof(m_Transform); i++) {
+
+		// マッピング済みのバッファを変換
+		void* ptr = m_Transform[i].GetMapBuf();
+		Transform* pWorld = reinterpret_cast<Transform*>(ptr);
+		pWorld->World *= ScaleMatrix;
+	}
+
+}
+
+
+void Object::ModelRotation(float angle) {
+
+	auto RotateMatrix = DirectX::XMMatrixRotationX(angle);
+
+	for (auto i = 0u; i < _countof(m_Transform); i++) {
+
+		// マッピング済みのバッファを変換
+		void* ptr = m_Transform[i].GetMapBuf();
+		Transform* pWorld = reinterpret_cast<Transform*>(ptr);
+		pWorld->World *= RotateMatrix;
+	}
+
+}
+
+
+void Object::ModelTranslation(Vector3 trans) {
+
+	auto TransMatrix = DirectX::XMMatrixTranslationFromVector(trans);
+
+	for (auto i = 0u; i < _countof(m_Transform); i++) {
+
+		//マッピング済みのバッファを変換
+		void* ptr = m_Transform[i].GetMapBuf();
+		Transform* pWorld = reinterpret_cast<Transform*>(ptr);
+		pWorld->World *= TransMatrix;
+	}
+
+}

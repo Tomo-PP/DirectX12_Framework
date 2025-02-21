@@ -402,15 +402,20 @@ bool App::OnInit() {
 
 
 	// ヒープサイズの設定
-	size_t size = 10;
+	size_t size = 20;
 	m_DespManager.Init_CBV_SRV_UAV(m_pDevice.Get(), size);
 
 	
 	// モデルのロード
-	if (!model.Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"Floor/Untitled.obj")){
+	if (!model[0].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"Floor/Untitled.obj")) {
 
 		return false;
 	}
+	if (!model[1].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+
+		return false;
+	}
+	model[1].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));  // モデルのスケール変更
 
 
 
@@ -693,7 +698,7 @@ void App::MainLoop() {
 
 void App::Update() {
 
-	model.Update(m_FrameIndex);
+	model[0].Update(m_FrameIndex);
 	
 }
 
@@ -758,7 +763,10 @@ void App::Render() {
 		m_pCmdList->RSSetScissorRects(1, &m_Scissor);                      /* シザー矩形の設定 */
 
 		// メッシュの描画
-		model.Render(m_pCmdList.Get(), m_FrameIndex);
+		for (auto i = 0u; i < _countof(model); i++) {
+
+			model[i].Render(m_pCmdList.Get(), m_FrameIndex);
+		}
 	}
 
 	// Imguiの描画
@@ -867,7 +875,11 @@ void App::OnTerm() {
 	m_pPSO.Reset();              // パイプラインステートの破棄
 
 	// モデルの破棄
-	model.Term();
+	for (auto i = 0u; i < _countof(model); i++) {
+
+		model[i].Term();
+	}
+
 
 	// ルートシグネチャの破棄
 	m_pRootSignature.Reset();

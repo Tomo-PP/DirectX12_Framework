@@ -101,14 +101,14 @@ private:
 	ComPtr<ID3D12PipelineState>  m_pPSO;                /* パイプラインステート */
 	DescriptorManager            m_DespManager;         /* ディスクリプタヒープの管理クラス */
 	
-	D3D12_VIEWPORT                m_Viewport;              /* ビューポート */
-	D3D12_RECT                    m_Scissor;               /* シザー矩形 */
+	D3D12_VIEWPORT                m_Viewport;           /* ビューポート */
+	D3D12_RECT                    m_Scissor;            /* シザー矩形 */
 
 
 	/*****************************************************************
 	 * オブジェクト
 	 *****************************************************************/
-	Object  model;
+	Object  model[2];
 
 
 	/*****************************************************************

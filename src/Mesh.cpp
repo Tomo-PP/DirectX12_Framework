@@ -8,7 +8,6 @@
 #include <assimp/postprocess.h>
 #include <codecvt>
 #include <cassert>
-#include <iostream>
 
 
 
@@ -320,9 +319,24 @@ void MeshLoader::ParseMaterial(Material& dstMaterial, const aiMaterial* pSrcMate
 
 
 	// 法線マップの読み取り
+	{
+		aiString path;
+
+		if (pSrcMaterial->Get(AI_MATKEY_TEXTURE_HEIGHT(0), path) == AI_SUCCESS) {
+
+			// 読み取りに成功したらマルチバイト文字列に変換後パスを格納
+			dstMaterial.NormalMap = std::string(path.C_Str());
+		}
+		else {
+
+			// 失敗したら文字列は空に
+			dstMaterial.NormalMap.clear();
+		}
+	}
 }
 
-}//
+
+}// namespace
 
 
 /****************************************************************

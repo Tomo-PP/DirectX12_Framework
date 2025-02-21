@@ -77,4 +77,15 @@ public:
 	 * 描画処理
 	 ****************************************************************/
 	virtual void Render(ID3D12GraphicsCommandList* pCmdList, uint32_t FrameIndex);
+
+
+	/****************************************************************
+	 * 変換行列関連の関数
+	 ****************************************************************/
+	void ModelScaling(Vector3 Scale);      /* スケール変更 */
+
+	void ModelRotation(float angle);                  /* 回転 */
+
+	void ModelTranslation(Vector3 trans);  /* 平行移動 */
+
 };

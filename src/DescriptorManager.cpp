@@ -190,7 +190,7 @@ bool DescriptorManager::Init_CBV_SRV_UAV(ID3D12Device* pDevice, size_t HeapSize)
 	// ディスクリプタヒープの設定
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;     /* 定数バッファを含んだフラグを指定 */
-	heapDesc.NumDescriptors = 10;                                         /* ディスクリプタの数 */
+	heapDesc.NumDescriptors = static_cast<UINT>(HeapSize);                /* ディスクリプタの数 */
 	heapDesc.NodeMask       = 0;                                          /* GPUは１つなので０を指定 */
 	heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;  /* シェーダー側から参照できるようにする */
 

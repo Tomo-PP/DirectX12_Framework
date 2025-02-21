@@ -7,6 +7,7 @@
 #include <DirectXMath.h>
 #include <string>
 #include <vector>
+#include <iostream>
 
 
 
@@ -54,6 +55,16 @@ struct Material {
 	float             alpha;       /* 透過成分 */
 	float             Shininess;   /* 鏡面反射強度 */
 	std::string       DiffuseMap;  /* テクスチャへのパス */
+	std::string       NormalMap;   /* 法線マップへのパス */
+
+	Material() :
+		Diffuse    (DirectX::XMFLOAT3()),
+		Specular   (DirectX::XMFLOAT3()),
+		alpha      (0),
+		Shininess  (0),
+		DiffuseMap (),
+		NormalMap  ()
+	{ /* DO_NOTHING */ };
 };
 
 
