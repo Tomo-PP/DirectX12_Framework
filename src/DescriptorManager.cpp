@@ -185,6 +185,27 @@ bool DescriptorManager::CreateDSV(ID3D12Device* pDevice, uint32_t Width, uint32_
 }
 
 
+bool DescriptorManager::Init_GlobalHeap(ID3D12Device* pDevice, size_t HeapSize) {
+
+	// ディスクリプタヒープの設定
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;     /* 定数バッファを含んだフラグを指定 */
+	heapDesc.NumDescriptors = static_cast<UINT>(HeapSize);                /* ディスクリプタの数 */
+	heapDesc.NodeMask       = 0;                                          /* GPUは１つなので０を指定 */
+	heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;  /* シェーダー側から参照できるようにする */
+
+	// ディスクリプタヒープの生成
+	HRESULT hr = pDevice->CreateDescriptorHeap(
+		&heapDesc,
+		IID_PPV_ARGS(m_pHeapGlobal.GetAddressOf()));
+	if (FAILED(hr)) {
+
+		return false;
+	}
+}
+
+
+
 bool DescriptorManager::Init_CBV_SRV_UAV(ID3D12Device* pDevice, size_t HeapSize) {
 
 	// ディスクリプタヒープの設定
@@ -254,6 +275,27 @@ bool DescriptorManager::CreateSRV(
 	// 生成カウント
 	AddCount();
 
+
+	return true;
+}
+
+
+bool DescriptorManager::CopyDescriptorHeap(
+	ID3D12Device*               pDevice, 
+	ID3D12DescriptorHeap*       localHeap,
+	D3D12_CPU_DESCRIPTOR_HANDLE srcHeapHandle)
+{
+
+	// ヒープのCPUハンドルを計算
+	auto incrementSize   = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	auto localHeapHandle = localHeap->GetCPUDescriptorHandleForHeapStart();
+	localHeapHandle.ptr += incrementSize * m_HeapCount;
+
+	// ディスクリプタをコピー
+	pDevice->CopyDescriptorsSimple(1u, localHeapHandle, srcHeapHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	
+	AddCount();
 
 	return true;
 }

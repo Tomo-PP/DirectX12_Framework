@@ -27,17 +27,19 @@ struct VSOutput{
 /*******************************************************
  * Camera 定数バッファ（View行列）
  *******************************************************/
-
+cbuffer CameraView : register(b0){
+    
+    float4x4 View : packoffset(c0);  // カメラ行列
+}
 
 
 /*******************************************************
  * Transform 定数バッファ
  *******************************************************/
-cbuffer Transform : register(b0){
+cbuffer Transform : register(b1){
 	
     float4x4 World      : packoffset(c0);   // ワールド行列（定数バッファの先頭）
-    float4x4 View       : packoffset(c4);   // ビュー行列（先頭から64バイト先）
-	float4x4 Projection : packoffset(c8);   // 射影行列（ウィンドウに写される行列座標、先頭から128バイト先）
+	float4x4 Projection : packoffset(c4);   // 射影行列（ウィンドウに写される行列座標、先頭から128バイト先）
 }
 
 

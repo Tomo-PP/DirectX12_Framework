@@ -18,10 +18,9 @@ using namespace DirectX::SimpleMath;
 /****************************************************************
  *  Transform 構造体 (メモリアライメント 256 Byte)
  ****************************************************************/
-struct alignas(256) Transform {
+struct Transform {
 
 	DirectX::XMMATRIX World;       /* ワールド行列 */
-	DirectX::XMMATRIX View;        /* ビュー行列 */
 	DirectX::XMMATRIX Projection;  /* 射影行列 */
 };
 

@@ -24,7 +24,7 @@ struct PSOutput{
 /*******************************************************
  * ライト 定数バッファ（CBV）
  *******************************************************/
-cbuffer LightBuffer : register(b1) {
+cbuffer LightBuffer : register(b2) {
     
     // cが１つでfloat4個分
     float3 LightPosition : packoffset(c0);  /* ライト座標 */
@@ -35,7 +35,7 @@ cbuffer LightBuffer : register(b1) {
 /*******************************************************
  * マテリアル 定数バッファ（CBV）
  *******************************************************/
-cbuffer Material : register(b2) {
+cbuffer Material : register(b3) {
     
     // cが１つで16 Byteなのでalphaの値は初めのアライメントのw成分で保存される（Shininessも同様）
     float3 Diffuse   : packoffset(c0);

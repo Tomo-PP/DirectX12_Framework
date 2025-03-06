@@ -22,7 +22,7 @@ class VerteBuffer;
 class IndexBuffer;
 class ConstantBuffer;
 class Texture;
-class DescriptorManaer;
+class DescriptorManager;
 
 
 /****************************************************************
@@ -85,6 +85,8 @@ public:
 	void ModelScaling(Vector3 Scale);      /* スケール変更 */
 
 	void ModelRotation(float angle);       /* 回転 */
+
+	void ModelQuaternion(float angle, Vector3 axis, Vector3 rot);     /* クォータニオン回転 */
 
 	void ModelTranslation(Vector3 trans);  /* 平行移動 */
 

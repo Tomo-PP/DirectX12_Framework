@@ -23,6 +23,8 @@
 #include "DescriptorManager.h"
 #include "ComPtr.h"
 #include "Object.h"
+#include "Input.h"
+#include "Camera.h"
 
 
 // imgui用
@@ -51,6 +53,7 @@ using namespace DirectX::SimpleMath;
  * class 宣言
  ****************************************************************/
 class DescriptorManager;
+class Input;
 
 
 /****************************************************************
@@ -109,6 +112,8 @@ private:
 	 * オブジェクト
 	 *****************************************************************/
 	Object  model[2];
+	Input input;
+	Camera camera;
 
 
 	/*****************************************************************

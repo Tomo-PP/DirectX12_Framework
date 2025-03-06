@@ -368,6 +368,21 @@ bool App::InitDirect3D() {
 
 bool App::OnInit() {
 
+	// 入力デバイスの初期化
+	if (!input.InitDirectInput(m_hInst)) {
+
+		return false;
+	}
+	if (!input.InitKeyBoard(m_hWnd)) {
+
+		return false;
+	}
+	if (!input.InitMouse(m_hWnd)) {
+
+		return false;
+	}
+
+
 	// Imguiの初期化
 	{
 		if (ImGui::CreateContext() == nullptr) {
@@ -401,6 +416,22 @@ bool App::OnInit() {
 	}
 
 
+	// グローバルディスクリプタヒープの作成
+	{
+		size_t globalSize = 2;  // カメラの数だけ
+		m_DespManager.Init_GlobalHeap(m_pDevice.Get(), globalSize);
+	}
+
+
+	// カメラの設定
+	{
+		if (!camera.Init(m_pDevice.Get(), &m_DespManager)) {
+
+			return false;
+		}
+	}
+
+
 	// ヒープサイズの設定
 	size_t size = 20;
 	m_DespManager.Init_CBV_SRV_UAV(m_pDevice.Get(), size);
@@ -415,6 +446,8 @@ bool App::OnInit() {
 
 		return false;
 	}
+	model[0].ModelScaling(Vector3(0.8f, 0.8f, 0.8f));
+	model[0].ModelTranslation(Vector3(0.0f, -1.0f, 0.0f));
 	model[1].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));  // モデルのスケール変更
 
 
@@ -448,37 +481,43 @@ bool App::OnInit() {
 
 
 		// ルートパラメーターの設定（CBV・SRVをシェーダーに送る | CBV | CBV | CBV | SRV | SRV | ）
+		D3D12_ROOT_PARAMETER rootParam[6] = {};
 
-		// 変換行列（CBV）
-		D3D12_ROOT_PARAMETER rootParam[5] = {};
+		// カメラ行列
 		rootParam[0].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;  /* ルートパラメーターのタイプは定数バッファ（CBV）*/
 		rootParam[0].Descriptor.ShaderRegister = 0;                              /* レジスタの開始番号 */
 		rootParam[0].Descriptor.RegisterSpace  = 0;                              /* 今回は使わない */
 		rootParam[0].ShaderVisibility          = D3D12_SHADER_VISIBILITY_VERTEX; /* 頂点シェーダーから参照できるようにする */
 
-		// ライト行列（CBV）
-		rootParam[1].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
-		rootParam[1].Descriptor.ShaderRegister = 1;
-		rootParam[1].Descriptor.RegisterSpace  = 0;
-		rootParam[1].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
+		// 変換行列（CBV）
+		rootParam[1].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV; 
+		rootParam[1].Descriptor.ShaderRegister = 1;                             
+		rootParam[1].Descriptor.RegisterSpace  = 0;                             
+		rootParam[1].ShaderVisibility          = D3D12_SHADER_VISIBILITY_VERTEX;
 
-		// マテリアル行列（CBV）
+		// ライト行列（CBV）
 		rootParam[2].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParam[2].Descriptor.ShaderRegister = 2;
 		rootParam[2].Descriptor.RegisterSpace  = 0;
 		rootParam[2].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
 
+		// マテリアル行列（CBV）
+		rootParam[3].ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParam[3].Descriptor.ShaderRegister = 3;
+		rootParam[3].Descriptor.RegisterSpace  = 0;
+		rootParam[3].ShaderVisibility          = D3D12_SHADER_VISIBILITY_PIXEL;
+
 		// テクスチャ用（SRV）
-		rootParam[3].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  /* ルートパラメーターのタイプ（ディスクリプターテーブル）*/
-		rootParam[3].DescriptorTable.NumDescriptorRanges = 1;                                           /* レンジの数 */
-		rootParam[3].DescriptorTable.pDescriptorRanges   = &range[0];                                   /* 設定したディスクリプタレンジを指定 */
-		rootParam[3].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               /* ピクセルシェーダーで使用できるようにする */
+		rootParam[4].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  /* ルートパラメーターのタイプ（ディスクリプターテーブル）*/
+		rootParam[4].DescriptorTable.NumDescriptorRanges = 1;                                           /* レンジの数 */
+		rootParam[4].DescriptorTable.pDescriptorRanges   = &range[0];                                   /* 設定したディスクリプタレンジを指定 */
+		rootParam[4].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               /* ピクセルシェーダーで使用できるようにする */
 
 		// 法線マップ用（SRV）
-		rootParam[4].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  
-		rootParam[4].DescriptorTable.NumDescriptorRanges = 1;                                           
-		rootParam[4].DescriptorTable.pDescriptorRanges   = &range[1];                                   
-		rootParam[4].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               
+		rootParam[5].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;  
+		rootParam[5].DescriptorTable.NumDescriptorRanges = 1;                                           
+		rootParam[5].DescriptorTable.pDescriptorRanges   = &range[1];                                   
+		rootParam[5].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;               
 
 
 		// スタティックサンプラーの設定
@@ -665,7 +704,6 @@ bool App::OnInit() {
 		m_Scissor.top    = 0;                                 /* 刈り取る領域の上 y座標 */
 		m_Scissor.bottom = m_Height;                          /* 刈り取る領域の下 y座標 */
 	}
-	
 
 	// 正常終了
 	return true;
@@ -698,7 +736,21 @@ void App::MainLoop() {
 
 void App::Update() {
 
-	model[0].Update(m_FrameIndex);
+	// キーの更新
+	input.Update();
+
+
+	// カメラの更新
+	camera.Update(&input);
+
+
+	//if (input.HoldKey(DIK_A)) {
+
+	//	model[0].Update(m_FrameIndex);
+	//}
+	//if (input.HoldKey(DIK_D)) {
+	//	model[1].ModelRotation(0.03f);
+	//}
 	
 }
 
@@ -757,7 +809,7 @@ void App::Render() {
 	{
 		ID3D12DescriptorHeap* heap = m_DespManager.GetHeapCBV_SRV_UAV();   /* ヒープの取得 */
 		m_pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());      /* ルートシグネチャを送信 */
-		m_pCmdList->SetDescriptorHeaps(1, &heap);                          /* CBV・SRV・UAVを送信 */
+		m_pCmdList->SetDescriptorHeaps(1u, &heap);
 		m_pCmdList->SetPipelineState(m_pPSO.Get());                        /* パイプラインステートの設定 */
 		m_pCmdList->RSSetViewports(1, &m_Viewport);                        /* ビューポートの設定 */
 		m_pCmdList->RSSetScissorRects(1, &m_Scissor);                      /* シザー矩形の設定 */
@@ -765,6 +817,10 @@ void App::Render() {
 		// メッシュの描画
 		for (auto i = 0u; i < _countof(model); i++) {
 
+			// カメラのセット
+			m_pCmdList->SetGraphicsRootConstantBufferView(0, camera.GetVirtualAddress(m_FrameIndex));
+
+			// モデルの描画
 			model[i].Render(m_pCmdList.Get(), m_FrameIndex);
 		}
 	}
@@ -874,11 +930,15 @@ void App::OnTerm() {
 
 	m_pPSO.Reset();              // パイプラインステートの破棄
 
+
 	// モデルの破棄
 	for (auto i = 0u; i < _countof(model); i++) {
 
 		model[i].Term();
 	}
+
+	// カメラの破棄
+	camera.Term();
 
 
 	// ルートシグネチャの破棄
@@ -895,6 +955,8 @@ void App::TermDirect3D() {
 
 	/* 生成した順番と逆順に解放していく */
 
+	// 入力デバイスの破棄
+	input.TermInputDevice();
 
 	// Imguiの破棄
 	m_pHeapForImgui.Reset();
@@ -1050,6 +1112,28 @@ void App::ImguiRender() {
 	// ウィンドウの定義
 	ImGui::Begin("Render Test Menu");
 	ImGui::SetWindowSize(ImVec2(300, 400), ImGuiCond_::ImGuiCond_FirstUseEver);
+
+	// チェックボタン
+	static bool blnChk = false;
+	ImGui::Checkbox("CheckBoxTest", &blnChk);
+
+	// ラジオボタン
+	static int radio = 0;
+	ImGui::RadioButton("Radio 1", &radio, 0);
+	ImGui::RadioButton("Radio 2", &radio, 1);
+
+	// int型スライダー
+	static int nSlider = 0;
+	ImGui::SliderInt("Int Slider", &nSlider, 0, 100);
+
+	// float型スライダー
+	static float fSlider = 0.0f;
+	ImGui::SliderFloat("float Slider", &fSlider, 0.0f, 100.0f);
+
+	// ベクトルスライダー
+	static float fSlider_3[3] = {};
+	ImGui::SliderFloat3("float3 Slider", fSlider_3, 0.0f, 100.0f);
+
 	ImGui::End();
 
 	ImGui::Render();

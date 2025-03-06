@@ -6,6 +6,8 @@
 #include "define.h"
 #include <iostream>
 #include "StrUtil.h"
+#include "Quaternion.h"
+#include <math.h>
 
 
 Object::Object():
@@ -58,6 +60,19 @@ bool Object::Init(
 	}
 
 
+	// カメラ用CBVの生成
+	auto srcHeapHandle = pDespManager->GetGlobalHeap()->GetCPUDescriptorHandleForHeapStart();
+	auto incrementSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	for (auto i = 0u; i < _countof(m_Transform); i++) {
+
+		srcHeapHandle.ptr += incrementSize * i;
+		if (!pDespManager->CopyDescriptorHeap(pDevice, pDespManager->GetHeapCBV_SRV_UAV(), srcHeapHandle)) {
+
+			return false;
+		}
+	}
+
+
 	// CBVの生成
 	for (auto i = 0u; i < _countof(m_Transform); i++) {
 
@@ -77,8 +92,7 @@ bool Object::Init(
 		void* ptr = m_Transform[i].GetMapBuf();
 		Transform* transform = reinterpret_cast<Transform*>(ptr);
 		transform->World      = DirectX::XMMatrixIdentity();
-		transform->View       = DirectX::XMMatrixLookAtRH(eyePos, targetPos, upward);
-		transform->Projection = DirectX::XMMatrixPerspectiveFovRH(fovY, aspect, 1.0f, 1000.0f);
+		transform->Projection = DirectX::XMMatrixPerspectiveFovLH(fovY, aspect, 1.0f, 1000.0f);
 	}
 
 
@@ -106,8 +120,8 @@ bool Object::Init(
 	material->alpha      = resMaterial[0].alpha;
 	material->Specular   = resMaterial[0].Specular;
 	material->Shininess  = resMaterial[0].Shininess;
-	std::cout << resMaterial[0].DiffuseMap << std::endl;
-	std::cout << resMaterial[0].NormalMap << std::endl;
+	//std::cout << resMaterial[0].DiffuseMap << std::endl;
+	//std::cout << resMaterial[0].NormalMap << std::endl;
 	std::wstring diffusePath = MbstrToWstr(resMaterial[0].DiffuseMap.c_str());
 	std::wstring normalPath  = MbstrToWstr(resMaterial[0].NormalMap.c_str());
 
@@ -167,17 +181,18 @@ void Object::Term() {
 void Object::Update(uint32_t FrameIndex) {
 	
 	ModelRotation(0.01f);
+
 }
 
 
 void Object::Render(ID3D12GraphicsCommandList* pCmdList, uint32_t FrameIndex) {
 
 	// テクスチャ・頂点
-	pCmdList->SetGraphicsRootConstantBufferView(0, m_Transform[FrameIndex].GetVirtualAddress()); /* 変換行列のセット */
-	pCmdList->SetGraphicsRootConstantBufferView(1, m_Light.GetVirtualAddress());                 /* ライトをセット */
-	pCmdList->SetGraphicsRootConstantBufferView(2, m_Material.GetVirtualAddress());              /* マテリアルのセット */
-	pCmdList->SetGraphicsRootDescriptorTable(3, m_DiffuseMap.GetHandleGPU());                    /* ディフューズマップのセット */
-	pCmdList->SetGraphicsRootDescriptorTable(4, m_NormalMap.GetHandleGPU());                     /* 法線マップのセット */
+	pCmdList->SetGraphicsRootConstantBufferView(1, m_Transform[FrameIndex].GetVirtualAddress()); /* 変換行列のセット */
+	pCmdList->SetGraphicsRootConstantBufferView(2, m_Light.GetVirtualAddress());                 /* ライトをセット */
+	pCmdList->SetGraphicsRootConstantBufferView(3, m_Material.GetVirtualAddress());              /* マテリアルのセット */
+	pCmdList->SetGraphicsRootDescriptorTable(4, m_DiffuseMap.GetHandleGPU());                    /* ディフューズマップのセット */
+	pCmdList->SetGraphicsRootDescriptorTable(5, m_NormalMap.GetHandleGPU());                     /* 法線マップのセット */
 	auto VBV = m_VB.GetVBV();
 	auto IBV = m_IB.GetIBV();
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -220,6 +235,26 @@ void Object::ModelRotation(float angle) {
 }
 
 
+void Object::ModelQuaternion(float angle, Vector3 axis, Vector3 rot) {
+
+	// 回転軸の設定
+	float radian = angle * (M_PI / 180);
+	axis.Normalize();
+
+	// クオータニオンの生成
+	float th = sin(radian / 2);
+	QuatLib::Quaternion quat = QuatLib::Quaternion(
+		axis.x * th,
+		axis.y * th,
+		axis.z * th,
+		cos(radian / 2)
+	);
+
+
+
+}
+
+
 void Object::ModelTranslation(Vector3 trans) {
 
 	auto TransMatrix = DirectX::XMMatrixTranslationFromVector(trans);
@@ -231,5 +266,7 @@ void Object::ModelTranslation(Vector3 trans) {
 		Transform* pWorld = reinterpret_cast<Transform*>(ptr);
 		pWorld->World *= TransMatrix;
 	}
+
+
 
 }
