@@ -438,17 +438,17 @@ bool App::OnInit() {
 
 	
 	// モデルのロード
-	if (!model[0].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"Floor/Untitled.obj")) {
+	if (!model[0].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
 
 		return false;
 	}
-	if (!model[1].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+	//if (!model[1].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
 
-		return false;
-	}
-	model[0].ModelScaling(Vector3(0.8f, 0.8f, 0.8f));
-	model[0].ModelTranslation(Vector3(0.0f, -1.0f, 0.0f));
-	model[1].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));  // モデルのスケール変更
+	//	return false;
+	//}
+	//model[0].ModelScaling(Vector3(0.8f, 0.8f, 0.8f));
+	//model[0].ModelTranslation(Vector3(0.0f, -1.0f, 0.0f));
+	model[0].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));  // モデルのスケール変更
 
 
 
@@ -821,7 +821,7 @@ void App::Render() {
 			m_pCmdList->SetGraphicsRootConstantBufferView(0, camera.GetVirtualAddress(m_FrameIndex));
 
 			// モデルの描画
-			model[i].Render(m_pCmdList.Get(), m_FrameIndex);
+			model[0].Render(m_pCmdList.Get(), m_FrameIndex);
 		}
 	}
 
