@@ -7,7 +7,7 @@
 - 入力デバイスの処理
 - カメラの制御
 
-<img src="gazou/画像２.png" width="50%">
+<img src="gazou/画像２.png" width="50%"><img src="gazou/画像８.png" width="50%">
 
 ## 使用したライブラリ
 - DirectXTK\
