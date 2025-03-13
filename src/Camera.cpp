@@ -18,7 +18,7 @@
 
 
 Camera::Camera():
-	eyePos    (Vector3(5.0f, 1.0f, 0.0f)),
+	eyePos    (Vector3(10.0f, 0.0f, 10.0f)),
 	targetPos (Vector3(0.0f, 0.0f, 0.0f)),
 	upward    (Vector3(0.0f, 1.0f, 0.0f)),
 	fovY      (45.0f),
@@ -137,7 +137,7 @@ Vector3 Camera::GetEyePos() const{
 }
 
 
-Vector3 Camera::GetTargetPos() const{
+Vector3 Camera::GetTargetPos() const {
 
 	return targetPos;
 }

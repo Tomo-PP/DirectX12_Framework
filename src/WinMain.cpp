@@ -433,7 +433,7 @@ bool App::OnInit() {
 
 
 	// ヒープサイズの設定
-	size_t size = 20;
+	size_t size = 50;
 	m_DespManager.Init_CBV_SRV_UAV(m_pDevice.Get(), size);
 
 	
@@ -442,14 +442,37 @@ bool App::OnInit() {
 
 		return false;
 	}
-	//if (!model[1].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+	model[0].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));   // モデルのスケール変更
 
-	//	return false;
-	//}
-	//model[0].ModelScaling(Vector3(0.8f, 0.8f, 0.8f));
-	//model[0].ModelTranslation(Vector3(0.0f, -1.0f, 0.0f));
-	model[0].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));  // モデルのスケール変更
 
+	if (!model[1].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+
+		return false;
+	}
+	model[1].ModelTranslation(Vector3(100.0f, -1.0f, 0.0f));
+	model[1].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));    // モデルのスケール変更
+
+	if (!model[2].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+
+		return false;
+	}
+	model[2].ModelTranslation(Vector3(0.0f, -1.0f, 100.0f));
+	model[2].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));    // モデルのスケール変更
+
+
+	if (!model[3].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+
+		return false;
+	}
+	model[3].ModelTranslation(Vector3(-100.0f, -1.0f, 0.0f));
+	model[3].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));    // モデルのスケール変更
+
+
+	if (!model[4].Init(m_pDevice.Get(), m_pCmdQueue.Get(), &m_DespManager, L"house/FarmhouseOBJ.obj")) {
+
+	}
+	model[4].ModelTranslation(Vector3(100.0f, -1.0f, 100.0f));
+	model[4].ModelScaling(Vector3(0.05f, 0.05f, 0.05f));    // モデルのスケール変更
 
 
 	// ルートシグネチャ生成（シェーダー内で使用するリソースの扱い方を決める）
@@ -821,7 +844,7 @@ void App::Render() {
 			m_pCmdList->SetGraphicsRootConstantBufferView(0, camera.GetVirtualAddress(m_FrameIndex));
 
 			// モデルの描画
-			model[0].Render(m_pCmdList.Get(), m_FrameIndex);
+			model[i].Render(m_pCmdList.Get(), m_FrameIndex);
 		}
 	}
 

@@ -53,7 +53,7 @@ bool SearchFilePath(const wchar_t* filename, std::wstring& result) {
 		return true;
 	}
 
-
+	std::cout << "ファイルが見つからなかった：" << filename << std::endl;
 	// パスが見つからなかった場合
 	return false;
 }

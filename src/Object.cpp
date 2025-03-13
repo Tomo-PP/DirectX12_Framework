@@ -81,11 +81,6 @@ bool Object::Init(
 			return false;
 		}
 
-		// ConstantBufferクラスで変換行列の初期化を定義する
-		auto eyePos    = DirectX::XMVectorSet(10.0f, 0.0f, 0.0f, 0.0f);    /* カメラ座標 */
-		auto targetPos = DirectX::XMVectorZero();                          /* 注視点座標（原点）*/
-		auto upward    = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);     /* カメラの高さ */
-
 		constexpr auto fovY   = DirectX::XMConvertToRadians(37.5f);                           /* カメラの Y軸に対する画角 */
 		auto aspect = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT);   /* 高さに対する幅の割合 */
 		
@@ -104,7 +99,7 @@ bool Object::Init(
 	}
 	void* ptr = m_Light.GetMapBuf();
 	Light* light = reinterpret_cast<Light*>(ptr);
-	light->LightPosition = Vector4(10.0f, 0.0f, 0.0f, 0.0f);
+	light->LightPosition = Vector4(10.0f, 0.0f, 10.0f, 0.0f);
 	light->LightColor    = Color(1.0f, 1.0f, 1.0f, 0.0f);
 
 
